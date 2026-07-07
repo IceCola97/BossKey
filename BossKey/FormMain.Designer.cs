@@ -31,6 +31,7 @@ namespace BossKey
         private void InitializeComponent()
         {
             components = new System.ComponentModel.Container();
+            System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(FormMain));
             listWindows = new ListView();
             columnHeader = new ColumnHeader();
             imageWindow = new ImageList(components);
@@ -210,6 +211,7 @@ namespace BossKey
             Controls.Add(groupConf);
             Controls.Add(textSearch);
             Controls.Add(listWindows);
+            Icon = (Icon)resources.GetObject("$this.Icon");
             MaximizeBox = false;
             Name = "FormMain";
             StartPosition = FormStartPosition.CenterScreen;
