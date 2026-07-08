@@ -7,7 +7,7 @@ namespace BossKey.Models
     internal sealed class WindowControllerManager : IWindowControllerManager
     {
         private readonly Lock _lock = new();
-        private readonly Dictionary<nint, IFixedWindowController> _controllers = [];
+        private readonly Dictionary<nint, ControllerReference> _controllers = [];
 
         public bool IsRegistered(IFixedWindowController controller)
         {
@@ -37,13 +37,13 @@ namespace BossKey.Models
 
             lock (_lock)
             {
-                if (_controllers.TryGetValue(hWnd, out var controller))
+                if (_controllers.TryGetValue(hWnd, out var controllerRef))
                 {
-                    return controller;
+                    return controllerRef.Controller;
                 }
 
                 var newController = new FixedWindowController(hWnd);
-                _controllers[hWnd] = newController;
+                Register(newController);
                 return newController;
             }
 
@@ -62,12 +62,13 @@ namespace BossKey.Models
 
             lock (_lock)
             {
-                if (_controllers.ContainsKey(hWnd))
+                if (_controllers.TryGetValue(hWnd, out var controllerRef))
                 {
-                    throw new InvalidOperationException("相同句柄的窗口控制器已注册。");
+                    controllerRef.Increment();
+                    return;
                 }
 
-                _controllers[hWnd] = controller;
+                _controllers[hWnd] = new ControllerReference(controller);
             }
         }
 
@@ -89,12 +90,33 @@ namespace BossKey.Models
                     return;
                 }
 
-                if (!ReferenceEquals(actual, controller))
+                if (!ReferenceEquals(actual.Controller, controller))
                 {
                     throw new InvalidOperationException("尝试注销的窗口控制器与已注册的窗口控制器不匹配。");
                 }
 
-                _controllers.Remove(hWnd);
+                if (!actual.Decrement())
+                    _controllers.Remove(hWnd);
+            }
+        }
+
+        private sealed class ControllerReference(IFixedWindowController controller)
+        {
+            private int _referenceCount = 1;
+
+            public IFixedWindowController Controller { get; } = controller
+                    ?? throw new ArgumentNullException(nameof(controller));
+
+            public int ReferenceCount => _referenceCount;
+
+            public void Increment()
+            {
+                _referenceCount++;
+            }
+
+            public bool Decrement()
+            {
+                return --_referenceCount > 0;
             }
         }
     }

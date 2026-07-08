@@ -81,10 +81,11 @@ namespace BossKey.Models
                     return;
                 }
 
+                bool oldHasValue = _autoHideHotkey.HasValue;
                 var hotkeyManager = ModelFactory.HotkeyManager;
 
                 // 如果之前已经注册了热键，那么需要先注销之前的热键
-                if (_autoHideHotkey.HasValue)
+                if (_autoHideHotkey != null)
                 {
                     hotkeyManager.UnregisterHotkey(_autoHideHotkey.Value);
                 }
@@ -123,7 +124,7 @@ namespace BossKey.Models
 
                 // 如果从没有热键变为有热键，那么需要增加引用计数器防止被释放
                 // 如果从有热键变为没有热键，那么需要减少引用计数器允许被释放
-                if (_autoHideHotkey.HasValue != value.HasValue)
+                if (oldHasValue != value.HasValue)
                 {
                     if (value.HasValue)
                     {
