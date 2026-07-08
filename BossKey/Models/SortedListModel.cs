@@ -16,9 +16,9 @@ namespace BossKey.Models
 
         public int Add(TKey key, TValue value)
         {
-            if (_list.TryAdd(key, value))
+            if (_realKeyMapper.TryAdd(key, key))
             {
-                _realKeyMapper.Add(key, key);
+                _list.Add(key, value);
                 return _list.Keys.IndexOf(key);
             }
 
@@ -28,15 +28,16 @@ namespace BossKey.Models
         public void Clear()
         {
             _list.Clear();
+            _realKeyMapper.Clear();
         }
 
         public void AddAll(IEnumerable<KeyValuePair<TKey, TValue>> items)
         {
             foreach (var item in items)
             {
-                if (_list.TryAdd(item.Key, item.Value))
+                if (_realKeyMapper.TryAdd(item.Key, item.Key))
                 {
-                    _realKeyMapper.Add(item.Key, item.Key);
+                    _list.Add(item.Key, item.Value);
                 }
             }
         }
@@ -57,7 +58,10 @@ namespace BossKey.Models
             int index = _list.Keys.IndexOf(realKey);
 
             if (index >= 0)
+            {
                 _list.RemoveAt(index);
+                _realKeyMapper.Remove(key);
+            }
 
             return index;
         }
