@@ -250,9 +250,16 @@ namespace BossKey
 
         private void SaveOpacityPanelState()
         {
+            var windowController = ModelFactory.WindowController;
+
+            if (windowController.Current == 0)
+            {
+                return;
+            }
+
             try
             {
-                ModelFactory.WindowController.Opacity = checkOpacity.Checked
+                windowController.Opacity = checkOpacity.Checked
                     ? (byte)trackOpacity.Value : null;
             }
             catch (Exception ex)
@@ -281,9 +288,16 @@ namespace BossKey
 
         private void SaveAutoHidePanelState()
         {
+            var windowController = ModelFactory.WindowController;
+
+            if (windowController.Current == 0)
+            {
+                return;
+            }
+
             try
             {
-                ModelFactory.WindowController.AutoHideHotkey =
+                windowController.AutoHideHotkey =
                     checkAutoHide.Checked
                     && hotkeyAutoHide.ModifierKeys != ModifierKey.None
                     && hotkeyAutoHide.BaseKey != Keys.None
@@ -311,9 +325,16 @@ namespace BossKey
 
         private void SaveVolumePanelState()
         {
+            var windowController = ModelFactory.WindowController;
+
+            if (windowController.Current == 0)
+            {
+                return;
+            }
+
             try
             {
-                ModelFactory.WindowController.Volume = checkVolume.Checked
+                windowController.Volume = checkVolume.Checked
                     ? (float)trackVolume.Value / 100 : null;
 
             }
@@ -336,9 +357,16 @@ namespace BossKey
 
         private void SaveTopMostPanelState()
         {
+            var windowController = ModelFactory.WindowController;
+
+            if (windowController.Current == 0)
+            {
+                return;
+            }
+
             try
             {
-                ModelFactory.WindowController.TopMost = checkTopmost.Checked;
+                windowController.TopMost = checkTopmost.Checked;
             }
             catch (Exception ex)
             {
@@ -441,10 +469,5 @@ namespace BossKey
         }
 
         #endregion Events
-
-        private void FormMain_Click(object sender, EventArgs e)
-        {
-            Debugger.Break();
-        }
     }
 }

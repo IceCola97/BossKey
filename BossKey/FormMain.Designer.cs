@@ -218,7 +218,6 @@ namespace BossKey
             Text = "BossKey";
             TopMost = true;
             Load += FormMain_Load;
-            Click += FormMain_Click;
             groupConf.ResumeLayout(false);
             groupConf.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)trackVolume).EndInit();
