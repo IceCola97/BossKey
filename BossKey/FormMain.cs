@@ -93,6 +93,8 @@ namespace BossKey
                     : trackVolume.Maximum;
                 (hotkeyAutoHide.ModifierKeys, hotkeyAutoHide.BaseKey) =
                     controller.AutoHideHotkey?.NormalizeLeft() ?? Hotkey.None;
+                labelOpacity.Text = $"{trackOpacity.Value / 255.0 * 100:F0}%";
+                labelVolume.Text = $"{trackVolume.Value}%";
             }
             catch (Exception ex)
             {
