@@ -17,6 +17,16 @@ namespace BossKey.Models
         public event WindowDestroyedEventHandler? WindowDestroyed;
 
         /// <summary>
+        /// 当有窗口被显示时触发的事件
+        /// </summary>
+        public event WindowShownEventHandler? WindowShown;
+
+        /// <summary>
+        /// 当有窗口被隐藏时触发的事件
+        /// </summary>
+        public event WindowHiddenEventHandler? WindowHidden;
+
+        /// <summary>
         /// 获取当前系统中所有窗口的数量
         /// </summary>
         int WindowCount { get; }
@@ -34,4 +44,6 @@ namespace BossKey.Models
 
     internal delegate void WindowCreatedEventHandler(ScannedWindow window);
     internal delegate void WindowDestroyedEventHandler(ScannedWindow window);
+    internal delegate void WindowShownEventHandler(ScannedWindow window);
+    internal delegate void WindowHiddenEventHandler(ScannedWindow window);
 }

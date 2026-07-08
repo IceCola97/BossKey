@@ -20,13 +20,13 @@ namespace BossKey.Models
         private static readonly int ThisProcessId = WindowsAPI.GetCurrentProcessId();
 
         private readonly HashSet<nint> _handles = [];
+        private readonly HashSet<nint> _shownHandles = [];
         private readonly Lock _lock = new();
         private volatile int _scanLock = 0;
 
 #if USE_WINEVENT
         private readonly WindowsAPI.WinEventProc _winEventCallback;
-        private nint _hookCreate;
-        private nint _hookDestroy;
+        private nint _hookWatch;
 #endif
 
 #if USE_POLLWATCH
@@ -42,6 +42,8 @@ namespace BossKey.Models
 
         public event WindowCreatedEventHandler? WindowCreated;
         public event WindowDestroyedEventHandler? WindowDestroyed;
+        public event WindowShownEventHandler? WindowShown;
+        public event WindowHiddenEventHandler? WindowHidden;
 
         private void DispatchWindowCreated(ScannedWindow window)
         {
@@ -67,6 +69,30 @@ namespace BossKey.Models
             }
         }
 
+        private void DispatchWindowShown(ScannedWindow scannedWindow)
+        {
+            try
+            {
+                WindowShown?.Invoke(scannedWindow);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"WindowShown event handler threw an exception: {ex}");
+            }
+        }
+
+        private void DispatchWindowHidden(ScannedWindow scannedWindow)
+        {
+            try
+            {
+                WindowHidden?.Invoke(scannedWindow);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"WindowHidden event handler threw an exception: {ex}");
+            }
+        }
+
         #endregion Events
 
         #region Constructor
@@ -79,22 +105,10 @@ namespace BossKey.Models
             // 保存委托引用防止被 GC 回收
             _winEventCallback = OnWinEvent;
 
-            // 监听窗口创建事件
-            _hookCreate = WindowsAPI.SetWinEventHook(
+            // 监听窗口相关事件
+            _hookWatch = WindowsAPI.SetWinEventHook(
                 WindowsAPI.WinEventId.ObjectCreate,
-                WindowsAPI.WinEventId.ObjectCreate,
-                0,
-                _winEventCallback,
-                0, 0,
-                WindowsAPI.WinEventFlags.OutOfContext
-             );
-
-            WindowsAPI.AssertLastError();
-
-            // 监听窗口销毁事件
-            _hookDestroy = WindowsAPI.SetWinEventHook(
-                WindowsAPI.WinEventId.ObjectDestroy,
-                WindowsAPI.WinEventId.ObjectDestroy,
+                WindowsAPI.WinEventId.ObjectHide,
                 0,
                 _winEventCallback,
                 0, 0,
@@ -130,6 +144,7 @@ namespace BossKey.Models
                 return;
 
             var scanResult = new HashSet<nint>();
+            var visibleSet = new HashSet<nint>();
 
             // 枚举所有顶层窗口并存入 HashSet
             WindowsAPI.EnumWindows((hWnd, _) =>
@@ -137,13 +152,17 @@ namespace BossKey.Models
                 if (ScannerFilter(hWnd))
                 {
                     scanResult.Add(hWnd);
+
+                    if (WindowsAPI.IsWindowVisible(hWnd))
+                    {
+                        visibleSet.Add(hWnd);
+                    }
                 }
 
                 return true;
             }, 0);
 
             // EnumWindows 可能出现错误，我们要重新校正
-
             HashSet<nint>? oldSet = null;
 
             lock (_lock)
@@ -158,6 +177,11 @@ namespace BossKey.Models
                 if (ScannerFilter(handle))
                 {
                     scanResult.Add(handle);
+
+                    if (WindowsAPI.IsWindowVisible(handle))
+                    {
+                        visibleSet.Add(handle);
+                    }
                 }
             }
 
@@ -177,10 +201,14 @@ namespace BossKey.Models
 
                 _handles.Clear();
                 _handles.UnionWith(scanResult);
+
+                _shownHandles.Clear();
+                _shownHandles.UnionWith(visibleSet);
             }
 
             var currentFilter = FilterInternal;
 
+            // 计算创建与销毁集合
             if (removedSet != null)
             {
                 foreach (nint handle in removedSet)
@@ -198,6 +226,43 @@ namespace BossKey.Models
 
                     if (scannedWindow is not null)
                         DispatchWindowCreated(scannedWindow);
+                }
+            }
+
+            // 计算可见性变化集合
+            if (triggerEvent)
+            {
+                HashSet<nint> showSet = [.. visibleSet];
+                HashSet<nint> hideSet = [.. scanResult];
+
+                hideSet.ExceptWith(showSet);
+
+                if (addedSet != null)
+                {
+                    showSet.ExceptWith(addedSet);
+                    hideSet.ExceptWith(addedSet);
+                }
+
+                if (removedSet != null)
+                {
+                    showSet.ExceptWith(removedSet);
+                    hideSet.ExceptWith(removedSet);
+                }
+
+                foreach (nint handle in showSet)
+                {
+                    var scannedWindow = GetFromHandle(handle, currentFilter);
+
+                    if (scannedWindow is not null)
+                        DispatchWindowShown(scannedWindow);
+                }
+
+                foreach (nint handle in hideSet)
+                {
+                    var scannedWindow = GetFromHandle(handle, currentFilter);
+
+                    if (scannedWindow is not null)
+                        DispatchWindowHidden(scannedWindow);
                 }
             }
 
@@ -224,6 +289,12 @@ namespace BossKey.Models
                     break;
                 case WindowsAPI.WinEventId.ObjectDestroy:
                     HandleRemoveWindow(hWnd);
+                    break;
+                case WindowsAPI.WinEventId.ObjectShow:
+                    HandleShowWindow(hWnd);
+                    break;
+                case WindowsAPI.WinEventId.ObjectHide:
+                    HandleHideWindow(hWnd);
                     break;
             }
         }
@@ -252,7 +323,17 @@ namespace BossKey.Models
             var scannedWindow = GetFromHandle(hWnd, FilterInternal);
 
             if (scannedWindow is not null)
+            {
+                if (scannedWindow.Visible)
+                {
+                    lock (_lock)
+                    {
+                        _shownHandles.Add(hWnd);
+                    }
+                }
+
                 DispatchWindowCreated(scannedWindow);
+            }
         }
 
         private void HandleRemoveWindow(nint hWnd)
@@ -261,10 +342,44 @@ namespace BossKey.Models
             {
                 if (!_handles.Remove(hWnd))
                     return;
+
+                _shownHandles.Remove(hWnd);
             }
 
             var scannedWindow = ForceGetFromHandle(hWnd, FilterInternal);
             DispatchWindowDestroyed(scannedWindow);
+        }
+
+        private void HandleShowWindow(nint hWnd)
+        {
+            lock (_lock)
+            {
+                if (!_handles.Contains(hWnd))
+                    return;
+
+                _shownHandles.Add(hWnd);
+            }
+
+            var scannedWindow = GetFromHandle(hWnd, FilterInternal);
+
+            if (scannedWindow is not null)
+                DispatchWindowShown(scannedWindow);
+        }
+
+        private void HandleHideWindow(nint hWnd)
+        {
+            lock (_lock)
+            {
+                if (!_handles.Contains(hWnd))
+                    return;
+
+                _shownHandles.Remove(hWnd);
+            }
+
+            var scannedWindow = GetFromHandle(hWnd, FilterInternal);
+
+            if (scannedWindow is not null)
+                DispatchWindowHidden(scannedWindow);
         }
 #endif
 
@@ -333,7 +448,8 @@ namespace BossKey.Models
                 {
                     Handle = hWnd,
                     Title = null,
-                    ProcessId = 0
+                    ProcessId = 0,
+                    Visible = false,
                 };
 
             return result;
@@ -366,11 +482,14 @@ namespace BossKey.Models
             if (pid == 0)
                 return null;
 
+            bool visible = WindowsAPI.IsWindowVisible(hWnd);
+
             return new ScannedWindow
             {
                 Handle = hWnd,
                 Title = title,
-                ProcessId = (int)pid
+                ProcessId = (int)pid,
+                Visible = visible,
             };
         }
 
@@ -395,6 +514,20 @@ namespace BossKey.Models
             return rect.Left >= rect.Right || rect.Top >= rect.Bottom;
         }
 
+        private static bool IsValidWindow(nint hWnd)
+        {
+            var style = (WindowsAPI.WindowStyle)WindowsAPI.GetWindowLong(hWnd, WindowsAPI.WindowLongIndex.Style);
+            var exStyle = (WindowsAPI.WindowExStyle)WindowsAPI.GetWindowLong(hWnd, WindowsAPI.WindowLongIndex.ExStyle);
+            return (style & (
+                    WindowsAPI.WindowStyle.Child
+                    | WindowsAPI.WindowStyle.Disabled
+                    | WindowsAPI.WindowStyle.Popup
+                )) == 0
+                && (exStyle & (
+                    WindowsAPI.WindowExStyle.NoActivate
+                )) == 0;
+        }
+
         private static bool ScannerFilter(nint hWnd)
         {
             if (hWnd == 0)
@@ -405,19 +538,22 @@ namespace BossKey.Models
             // 检查窗口是否仍然存在
             if (!WindowsAPI.IsWindow(hWnd))
                 return false;
-            // 检查窗口是否可见
-            if (!WindowsAPI.IsWindowVisible(hWnd))
-                return false;
             if (!WindowsAPI.GetWindowRect(hWnd, out var rect)
                 || IsEmptyRect(rect))
                 return false;
             // 检查窗口标题是否为空
             if (WindowsAPI.GetWindowTextLength(hWnd) <= 0)
                 return false;
+            // 检查窗口是否有效
+            if (!IsValidWindow(hWnd))
+                return false;
+
+#if HIDE_SELF
             // 检查窗口是否属于当前进程（如果是，则忽略）
             if (WindowsAPI.GetWindowThreadProcessId(hWnd, out uint pid) != 0
                 && pid == ThisProcessId)
                 return false;
+#endif
 
             return true;
         }
@@ -432,16 +568,10 @@ namespace BossKey.Models
                 return;
 
 #if USE_WINEVENT
-            if (_hookCreate != 0)
+            if (_hookWatch != 0)
             {
-                WindowsAPI.UnhookWinEvent(_hookCreate);
-                _hookCreate = 0;
-            }
-
-            if (_hookDestroy != 0)
-            {
-                WindowsAPI.UnhookWinEvent(_hookDestroy);
-                _hookDestroy = 0;
+                WindowsAPI.UnhookWinEvent(_hookWatch);
+                _hookWatch = 0;
             }
 #endif
 

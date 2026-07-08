@@ -32,6 +32,16 @@ namespace BossKey.Models
             Style = -16
         }
 
+        /// <summary>窗口样式 (WS_*)</summary>
+        [Flags]
+        public enum WindowStyle : uint
+        {
+            Child = 0x40000000,
+            Disabled = 0x08000000,
+            Popup = 0x80000000,
+            Visible = 0x10000000,
+        }
+
         /// <summary>扩展窗口样式 (WS_EX_*)</summary>
         [Flags]
         public enum WindowExStyle : uint
@@ -40,7 +50,8 @@ namespace BossKey.Models
             Layered = 0x00080000,
             Transparent = 0x00000020,
             ToolWindow = 0x00000080,
-            AppWindow = 0x00040000
+            AppWindow = 0x00040000,
+            NoActivate = 0x08000000,
         }
 
         /// <summary>SetLayeredWindowAttributes 标志</summary>

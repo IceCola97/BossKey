@@ -14,6 +14,8 @@ namespace BossKey.Models
 
         public int ProcessId { get; internal set; }
 
+        public bool Visible { get; internal set; }
+
         public int CompareTo(ScannedWindow? other)
         {
             if (other == null) return 1;

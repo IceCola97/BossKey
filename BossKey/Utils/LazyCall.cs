@@ -78,5 +78,33 @@ namespace BossKey.Utils
                 _debounceTimers[site] = timer;
             }
         }
+
+        /// <summary>
+        /// 取消指定 site 的节流计时器，使其立即可以再次执行 action。
+        /// </summary>
+        /// <param name="site"></param>
+        public static void ResetThrottle(string site)
+        {
+            lock (_throttleLock)
+            {
+                _throttleLastTimes.Remove(site);
+            }
+        }
+
+        /// <summary>
+        /// 取消指定 site 的防抖计时器，如果存在的话。
+        /// </summary>
+        /// <param name="site"></param>
+        public static void CancelDebounce(string site)
+        {
+            lock (_debounceLock)
+            {
+                if (_debounceTimers.TryGetValue(site, out var existingTimer))
+                {
+                    existingTimer.Dispose();
+                    _debounceTimers.Remove(site);
+                }
+            }
+        }
     }
 }

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Text;
 
 namespace BossKey.Models
@@ -64,6 +65,17 @@ namespace BossKey.Models
             }
 
             return index;
+        }
+
+        public bool TryGetValue(TKey key, [NotNullWhen(true)] out TValue? value)
+        {
+            if (_realKeyMapper.TryGetValue(key, out var realKey))
+            {
+                return _list.TryGetValue(realKey, out value!);
+            }
+
+            value = default;
+            return false;
         }
 
         IEnumerator IEnumerable.GetEnumerator()
