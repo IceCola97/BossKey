@@ -37,14 +37,19 @@ namespace BossKey.Models
 
             lock (_lock)
             {
+                IFixedWindowController resultController;
+
                 if (_controllers.TryGetValue(hWnd, out var controllerRef))
                 {
-                    return controllerRef.Controller;
+                    resultController = controllerRef.Controller;
+                }
+                else
+                {
+                    resultController = new FixedWindowController(hWnd);
                 }
 
-                var newController = new FixedWindowController(hWnd);
-                Register(newController);
-                return newController;
+                Register(resultController);
+                return resultController;
             }
 
         }
@@ -85,18 +90,25 @@ namespace BossKey.Models
 
             lock (_lock)
             {
-                if (!_controllers.TryGetValue(hWnd, out var actual))
+                if (!_controllers.TryGetValue(hWnd, out var controllerRef))
                 {
                     return;
                 }
 
-                if (!ReferenceEquals(actual.Controller, controller))
+                if (!ReferenceEquals(controllerRef.Controller, controller))
                 {
                     throw new InvalidOperationException("尝试注销的窗口控制器与已注册的窗口控制器不匹配。");
                 }
 
-                if (!actual.Decrement())
+                if (!controllerRef.Decrement())
+                {
                     _controllers.Remove(hWnd);
+
+                    if (controllerRef.Controller is IDisposable disposable)
+                    {
+                        disposable.Dispose();
+                    }
+                }
             }
         }
 

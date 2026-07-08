@@ -3,7 +3,7 @@ using System;
 
 namespace BossKey.Models
 {
-    internal sealed class FixedWindowController : IFixedWindowController
+    internal sealed class FixedWindowController : IFixedWindowController, IDisposable
     {
         private readonly nint _hWnd;
         private byte? _opacity;
@@ -11,6 +11,7 @@ namespace BossKey.Models
         private float? _volume;
         private bool _topMost;
         private nint _processId;
+        private volatile Action? _hotkeyReleaseAction = null;
 
         public FixedWindowController(nint hWnd)
         {
@@ -78,7 +79,12 @@ namespace BossKey.Models
 
         public void ReapplyProperties()
         {
-            WindowControllerCore.SetWindowOpacity(_hWnd, _opacity ?? 255);
+            if (!WindowsAPI.IsWindow(_hWnd))
+            {
+                return;
+            }
+
+            WindowControllerCore.SetWindowOpacity(_hWnd, _opacity);
             WindowControllerCore.SetWindowTopMost(_hWnd, _topMost);
         }
 
@@ -119,7 +125,7 @@ namespace BossKey.Models
                 // 如果之前已经注册了热键，那么需要先注销之前的热键
                 if (_autoHideHotkey != null)
                 {
-                    hotkeyManager.UnregisterHotkey(_autoHideHotkey.Value);
+                    ReleaseHotkey();
                 }
 
                 // 如果新的热键有值，那么需要注册新的热键
@@ -130,8 +136,7 @@ namespace BossKey.Models
                         if (!WindowsAPI.IsWindow(_hWnd))
                         {
                             // 如果窗口已经不存在，那么需要注销热键
-                            ModelFactory.HotkeyManager.UnregisterHotkey(value.Value);
-                            ModelFactory.WindowControllerManager.Unregister(this);
+                            ReleaseHotkey();
                             return;
                         }
 
@@ -150,6 +155,12 @@ namespace BossKey.Models
                     {
                         throw new InvalidOperationException("注册热键失败，可能是热键冲突。");
                     }
+
+                    // 注册新的热键释放动作，确保在 Dispose 时能够正确注销热键
+                    Interlocked.Exchange(ref _hotkeyReleaseAction, () =>
+                    {
+                        hotkeyManager.UnregisterHotkey(value.Value);
+                    });
                 }
 
                 _autoHideHotkey = value;
@@ -208,6 +219,17 @@ namespace BossKey.Models
                 WindowControllerCore.SetWindowTopMost(_hWnd, value);
                 _topMost = value;
             }
+        }
+
+        private void ReleaseHotkey()
+        {
+            var hotkeyReleaseAction = Interlocked.Exchange(ref _hotkeyReleaseAction, null);
+            hotkeyReleaseAction?.Invoke();
+        }
+
+        public void Dispose()
+        {
+            ReleaseHotkey();
         }
     }
 }
