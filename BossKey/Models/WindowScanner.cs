@@ -521,7 +521,6 @@ namespace BossKey.Models
             return (style & (
                     WindowsAPI.WindowStyle.Child
                     | WindowsAPI.WindowStyle.Disabled
-                    | WindowsAPI.WindowStyle.Popup
                 )) == 0
                 && (exStyle & (
                     WindowsAPI.WindowExStyle.NoActivate
