@@ -332,6 +332,7 @@ namespace BossKey
             {
                 // 切换开发模式
                 GlobalConfigs.DevelopMode = !GlobalConfigs.DevelopMode;
+                _updatingListModel.Invalidate();
             }
         }
 

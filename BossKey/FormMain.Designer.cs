@@ -212,6 +212,7 @@ namespace BossKey
             Controls.Add(textSearch);
             Controls.Add(listWindows);
             Icon = (Icon)resources.GetObject("$this.Icon");
+            KeyPreview = true;
             MaximizeBox = false;
             Name = "FormMain";
             StartPosition = FormStartPosition.CenterScreen;
