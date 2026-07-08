@@ -261,6 +261,9 @@ namespace BossKey.Models
         [LibraryImport("user32.dll", SetLastError = true)]
         public static partial nint GetDesktopWindow();
 
+        [LibraryImport("kernel32.dll", SetLastError = true)]
+        public static partial int GetCurrentProcessId();
+
         #endregion
 
         #region Structs

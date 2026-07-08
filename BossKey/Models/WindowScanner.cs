@@ -1,6 +1,7 @@
 #define USE_WINEVENT
 #define USE_POLLWATCH
 //#define SHORT_POLLWATCH
+#define HIDE_SELF
 
 using System;
 using System.Collections.Generic;
@@ -15,6 +16,8 @@ namespace BossKey.Models
     internal sealed class WindowScanner : IWindowScanner, IDisposable
     {
         #region Fields
+
+        private static readonly int ThisProcessId = WindowsAPI.GetCurrentProcessId();
 
         private readonly HashSet<nint> _handles = [];
         private readonly Lock _lock = new();
@@ -227,6 +230,45 @@ namespace BossKey.Models
                     break;
             }
         }
+
+        private void PostAddWindow(nint hWnd, int duration = 300)
+        {
+            Task.Run(async () =>
+            {
+                await Task.Delay(duration); // 延迟指定毫秒后处理窗口添加
+
+                HandleAddWindow(hWnd);
+            });
+        }
+
+        private void HandleAddWindow(nint hWnd)
+        {
+            if (!ScannerFilter(hWnd))
+                return;
+
+            lock (_lock)
+            {
+                if (!_handles.Add(hWnd))
+                    return;
+            }
+
+            var scannedWindow = GetFromHandle(hWnd, _filter);
+
+            if (scannedWindow is not null)
+                DispatchWindowCreated(scannedWindow);
+        }
+
+        private void HandleRemoveWindow(nint hWnd)
+        {
+            lock (_lock)
+            {
+                if (!_handles.Remove(hWnd))
+                    return;
+            }
+
+            var scannedWindow = ForceGetFromHandle(hWnd, _filter);
+            DispatchWindowDestroyed(scannedWindow);
+        }
 #endif
 
         #endregion
@@ -278,48 +320,6 @@ namespace BossKey.Models
         #endregion
 
         #region Helpers
-
-#if USE_WINEVENT
-        private void PostAddWindow(nint hWnd, int duration = 300)
-        {
-            Task.Run(async () =>
-            {
-                await Task.Delay(duration); // 延迟指定毫秒后处理窗口添加
-
-                HandleAddWindow(hWnd);
-            });
-        }
-
-        private void HandleAddWindow(nint hWnd)
-        {
-            if (!ScannerFilter(hWnd))
-                return;
-
-            lock (_lock)
-            {
-                if (!_handles.Add(hWnd))
-                    return;
-            }
-
-            var scannedWindow = GetFromHandle(hWnd, _filter);
-
-            if (scannedWindow is not null)
-                DispatchWindowCreated(scannedWindow);
-        }
-
-        private void HandleRemoveWindow(nint hWnd)
-        {
-            lock (_lock)
-            {
-                if (!_handles.Remove(hWnd))
-                    return;
-            }
-
-            var scannedWindow = ForceGetFromHandle(hWnd, _filter);
-            DispatchWindowDestroyed(scannedWindow);
-        }
-#endif
-
         private static ScannedWindow ForceGetFromHandle(
             nint hWnd,
             string? filter = null
@@ -411,6 +411,10 @@ namespace BossKey.Models
                 return false;
             // 检查窗口标题是否为空
             if (WindowsAPI.GetWindowTextLength(hWnd) <= 0)
+                return false;
+            // 检查窗口是否属于当前进程（如果是，则忽略）
+            if (WindowsAPI.GetWindowThreadProcessId(hWnd, out uint pid) != 0
+                && pid == ThisProcessId)
                 return false;
 
             return true;
