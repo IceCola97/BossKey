@@ -179,16 +179,13 @@ namespace BossKey.Models
                 _handles.UnionWith(scanResult);
             }
 
+            var currentFilter = FilterInternal;
+
             if (removedSet != null)
             {
                 foreach (nint handle in removedSet)
                 {
-                    if (ScannerFilter(handle))
-                    {
-                        Debugger.Break();
-                    }
-
-                    var scannedWindow = ForceGetFromHandle(handle, _filter);
+                    var scannedWindow = ForceGetFromHandle(handle, currentFilter);
                     DispatchWindowDestroyed(scannedWindow);
                 }
             }
@@ -197,7 +194,7 @@ namespace BossKey.Models
             {
                 foreach (nint handle in addedSet)
                 {
-                    var scannedWindow = GetFromHandle(handle, _filter);
+                    var scannedWindow = GetFromHandle(handle, currentFilter);
 
                     if (scannedWindow is not null)
                         DispatchWindowCreated(scannedWindow);
@@ -252,7 +249,7 @@ namespace BossKey.Models
                     return;
             }
 
-            var scannedWindow = GetFromHandle(hWnd, _filter);
+            var scannedWindow = GetFromHandle(hWnd, FilterInternal);
 
             if (scannedWindow is not null)
                 DispatchWindowCreated(scannedWindow);
@@ -266,7 +263,7 @@ namespace BossKey.Models
                     return;
             }
 
-            var scannedWindow = ForceGetFromHandle(hWnd, _filter);
+            var scannedWindow = ForceGetFromHandle(hWnd, FilterInternal);
             DispatchWindowDestroyed(scannedWindow);
         }
 #endif
@@ -298,7 +295,7 @@ namespace BossKey.Models
                 {
                     handlesSnapshot = new nint[_handles.Count];
                     _handles.CopyTo(handlesSnapshot);
-                    currentFilter = _filter;
+                    currentFilter = FilterInternal;
                 }
 
                 foreach (var hWnd in handlesSnapshot)
@@ -320,6 +317,10 @@ namespace BossKey.Models
         #endregion
 
         #region Helpers
+
+        private string? FilterInternal
+            => string.IsNullOrEmpty(_filter) ? null : _filter;
+
         private static ScannedWindow ForceGetFromHandle(
             nint hWnd,
             string? filter = null
@@ -379,6 +380,7 @@ namespace BossKey.Models
         private static string? GetWindowTitle(nint hWnd)
         {
             int length = WindowsAPI.GetWindowTextLength(hWnd);
+
             if (length == 0)
                 return null;
 
