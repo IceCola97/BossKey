@@ -216,22 +216,20 @@ namespace BossKey.Models
 
         private string? GetWindowIcon(ScannedWindow window)
         {
-            // 优先使用 GetClassLong 获取图标（不发送窗口消息，性能远优于 SendMessage）
-            nint hIcon = WindowsAPI.GetClassLong(window.Handle, WindowsAPI.ClassLongIndex.HIconSm);
+            nint hIcon = WindowsAPI.SendMessage(window.Handle, WindowsAPI.WindowMessage.GetIcon, (nint)WindowsAPI.IconSize.Small2, 0);
 
             if (hIcon == 0)
             {
-                hIcon = WindowsAPI.GetClassLong(window.Handle, WindowsAPI.ClassLongIndex.HIcon);
+                hIcon = WindowsAPI.SendMessage(window.Handle, WindowsAPI.WindowMessage.GetIcon, (nint)WindowsAPI.IconSize.Small, 0);
             }
 
-            // 仅当 GetClassLong 无法获取图标时才回退到 SendMessage
             if (hIcon == 0)
             {
-                hIcon = WindowsAPI.SendMessage(window.Handle, WindowsAPI.WindowMessage.GetIcon, (nint)WindowsAPI.IconSize.Small2, 0);
+                hIcon = WindowsAPI.GetClassLong(window.Handle, WindowsAPI.ClassLongIndex.HIconSm);
 
                 if (hIcon == 0)
                 {
-                    hIcon = WindowsAPI.SendMessage(window.Handle, WindowsAPI.WindowMessage.GetIcon, (nint)WindowsAPI.IconSize.Small, 0);
+                    hIcon = WindowsAPI.GetClassLong(window.Handle, WindowsAPI.ClassLongIndex.HIcon);
                 }
             }
 
