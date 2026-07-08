@@ -161,5 +161,77 @@ namespace BossKey.Models
                 throw;
             }
         }
+
+        /// <summary>
+        /// 获取指定窗口所在进程的当前音量
+        /// </summary>
+        /// <param name="hWnd">窗口句柄</param>
+        /// <param name="processId">进程 ID（0 表示从窗口获取），返回时设置为实际使用的进程 ID</param>
+        /// <returns>音量值 0.0-1.0，无法获取时返回 null</returns>
+        public static float? GetWindowProcessVolume(nint hWnd, ref nint processId)
+        {
+            // 获取目标进程 ID
+            uint targetPid;
+            if (processId == 0)
+            {
+                WindowsAPI.GetWindowThreadProcessId(hWnd, out targetPid);
+                processId = (nint)targetPid;
+            }
+            else
+            {
+                targetPid = (uint)processId;
+            }
+
+            try
+            {
+                var cw = new StrategyBasedComWrappers();
+
+                var clsid = new Guid("BCDE0395-E52F-467C-8E3D-C4579291692E");
+                var type = Type.GetTypeFromCLSID(clsid)!;
+                var obj = Activator.CreateInstance(type)!;
+                var enumerator = (WindowsAPI.IMMDeviceEnumerator)obj;
+
+                if (enumerator.GetDefaultAudioEndpoint(0, 0, out nint pDevice) != 0)
+                    return null;
+
+                var device = (WindowsAPI.IMMDevice)cw.GetOrCreateObjectForComInstance(pDevice, CreateObjectFlags.None);
+
+                Guid iidAsm2 = typeof(WindowsAPI.IAudioSessionManager2).GUID;
+                if (device.Activate(ref iidAsm2, 1, 0, out nint pAsm2) != 0)
+                    return null;
+
+                var sessionManager = (WindowsAPI.IAudioSessionManager2)cw.GetOrCreateObjectForComInstance(pAsm2, CreateObjectFlags.None);
+
+                if (sessionManager.GetSessionEnumerator(out nint pEnum) != 0)
+                    return null;
+                var sessionEnum = (WindowsAPI.IAudioSessionEnumerator)cw.GetOrCreateObjectForComInstance(pEnum, CreateObjectFlags.None);
+
+                sessionEnum.GetCount(out int count);
+
+                for (int i = 0; i < count; i++)
+                {
+                    if (sessionEnum.GetSession(i, out nint pSession) != 0)
+                        continue;
+
+                    var session = (WindowsAPI.IAudioSessionControl)cw.GetOrCreateObjectForComInstance(pSession, CreateObjectFlags.None);
+
+                    var session2 = (WindowsAPI.IAudioSessionControl2)session;
+                    session2.GetProcessId(out uint sessionPid);
+
+                    if (sessionPid == targetPid)
+                    {
+                        var simpleVolume = (WindowsAPI.ISimpleAudioVolume)session;
+                        simpleVolume.GetMasterVolume(out float vol);
+                        return vol;
+                    }
+                }
+
+                return null;
+            }
+            catch
+            {
+                return null;
+            }
+        }
     }
 }

@@ -24,10 +24,32 @@ namespace BossKey.Models
             _autoHideHotkey = null;
             _volume = null;
             _processId = 0;
+            _topMost = false;
 
+            InitWindowData();
+        }
+
+        private void InitWindowData()
+        {
             // 动态获取当前窗口的置顶状态
-            nint exStyle = WindowsAPI.GetWindowLong(hWnd, WindowsAPI.WindowLongIndex.ExStyle);
+            nint exStyle = WindowsAPI.GetWindowLong(_hWnd, WindowsAPI.WindowLongIndex.ExStyle);
             _topMost = ((uint)exStyle & (uint)WindowsAPI.WindowExStyle.TopMost) != 0;
+
+            // 动态获取当前窗口的透明度
+            if (((uint)exStyle & (uint)WindowsAPI.WindowExStyle.Layered) != 0)
+            {
+                if (WindowsAPI.GetLayeredWindowAttributes(_hWnd, out _, out byte alpha, out _)
+                    && alpha != 255)
+                {
+                    _opacity = alpha;
+                }
+            }
+
+            // 动态获取当前窗口进程的音量
+            float? volume = WindowControllerCore.GetWindowProcessVolume(_hWnd, ref _processId);
+
+            if (volume.HasValue && volume.Value < 1)
+                _volume = volume.Value;
         }
 
         private void CheckWindowAlive()
@@ -42,6 +64,16 @@ namespace BossKey.Models
         {
             CheckWindowAlive();
             return value;
+        }
+
+        private void AwakeWindow()
+        {
+            // 如果窗口被最小化，先还原
+            WindowsAPI.ShowWindow(_hWnd, WindowsAPI.ShowWindowCmd.Restore);
+            // 将窗口提升到 Z 序顶部并激活
+            WindowsAPI.BringWindowToTop(_hWnd);
+            // 设为系统前台窗口
+            WindowsAPI.SetForegroundWindow(_hWnd);
         }
 
         private void ReapplyProperties()
@@ -109,6 +141,8 @@ namespace BossKey.Models
                             {
                                 // 重新应用属性防止失效
                                 ReapplyProperties();
+                                // 唤醒窗口防止被其他窗口遮挡
+                                AwakeWindow();
                             }
                         }
                         catch { }

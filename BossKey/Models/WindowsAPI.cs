@@ -229,7 +229,19 @@ namespace BossKey.Models
 
         [LibraryImport("user32.dll", SetLastError = true)]
         [return: MarshalAs(UnmanagedType.Bool)]
+        public static partial bool GetLayeredWindowAttributes(nint hWnd, out uint pcrKey, out byte pbAlpha, out LayeredWindowAttribute pdwFlags);
+
+        [LibraryImport("user32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
         public static partial bool ShowWindow(nint hWnd, ShowWindowCmd nCmdShow);
+
+        [LibraryImport("user32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        public static partial bool SetForegroundWindow(nint hWnd);
+
+        [LibraryImport("user32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        public static partial bool BringWindowToTop(nint hWnd);
 
         [LibraryImport("user32.dll", SetLastError = true)]
         [return: MarshalAs(UnmanagedType.Bool)]
