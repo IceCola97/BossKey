@@ -46,6 +46,7 @@ namespace BossKey
             checkAutoHide = new CheckBox();
             trackOpacity = new TrackBar();
             checkOpacity = new CheckBox();
+            timerLock = new System.Windows.Forms.Timer(components);
             groupConf.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)trackVolume).BeginInit();
             ((System.ComponentModel.ISupportInitialize)trackOpacity).BeginInit();
@@ -203,6 +204,12 @@ namespace BossKey
             checkOpacity.UseVisualStyleBackColor = true;
             checkOpacity.CheckedChanged += CheckOpacity_CheckedChanged;
             // 
+            // timerLock
+            // 
+            timerLock.Enabled = true;
+            timerLock.Interval = 50;
+            timerLock.Tick += TimerLock_Tick;
+            // 
             // FormMain
             // 
             AutoScaleDimensions = new SizeF(9F, 20F);
@@ -244,5 +251,6 @@ namespace BossKey
         private Label labelVolume;
         private ImageList imageWindow;
         private ColumnHeader columnHeader;
+        private System.Windows.Forms.Timer timerLock;
     }
 }

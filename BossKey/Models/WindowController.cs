@@ -59,6 +59,11 @@ namespace BossKey.Models
             set => CheckWindowAlive().TopMost = value;
         }
 
+        public void ReapplyProperties()
+        {
+            CheckWindowAlive().ReapplyProperties();
+        }
+
         private nint CloseInternal(IFixedWindowController current)
         {
             CheckFixedWindowController(current);

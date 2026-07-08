@@ -76,7 +76,7 @@ namespace BossKey.Models
             WindowsAPI.SetForegroundWindow(_hWnd);
         }
 
-        private void ReapplyProperties()
+        public void ReapplyProperties()
         {
             WindowControllerCore.SetWindowOpacity(_hWnd, _opacity ?? 255);
             WindowControllerCore.SetWindowTopMost(_hWnd, _topMost);

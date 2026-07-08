@@ -336,6 +336,15 @@ namespace BossKey
             }
         }
 
+        private void TimerLock_Tick(object sender, EventArgs e)
+        {
+            // 对于一些窗口可能会反复清空属性，所以为了优化体验，对于当前窗口将使用定时器定期刷新属性
+            if (ModelFactory.WindowController.Current != 0)
+            {
+                ModelFactory.WindowController.ReapplyProperties();
+            }
+        }
+
         #endregion Events
     }
 }
