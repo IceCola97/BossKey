@@ -1,5 +1,7 @@
 using BossKey.Utils;
 using System;
+using System.ComponentModel;
+using System.Diagnostics;
 
 namespace BossKey.Models
 {
@@ -89,9 +91,22 @@ namespace BossKey.Models
                 return;
             }
 
-            WindowControllerCore.SetWindowOpacity(_hWnd, _opacity);
-            WindowControllerCore.SetWindowTopMost(_hWnd, _topMost);
-            WindowControllerCore.SetWindowTransparentColor(_hWnd, _transparentColor);
+            try
+            {
+                WindowControllerCore.SetWindowOpacity(_hWnd, _opacity);
+                WindowControllerCore.SetWindowTopMost(_hWnd, _topMost);
+                WindowControllerCore.SetWindowTransparentColor(_hWnd, _transparentColor);
+            }
+            catch (Win32Exception ex)
+            {
+                if (ex.ErrorCode == 87)
+                {
+                    // 某些时候可能窗口状态异常，导致设置属性失败，我们忽略此次错误，避免程序崩溃
+                    return;
+                }
+
+                Debug.WriteLine($"ReapplyProperties failed: {ex}");
+            }
         }
 
         public nint Current => _hWnd;
