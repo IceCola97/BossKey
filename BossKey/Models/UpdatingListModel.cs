@@ -1,4 +1,6 @@
-﻿using BossKey.Utils;
+﻿#define IDLE_UPDATE
+
+using BossKey.Utils;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -12,7 +14,11 @@ namespace BossKey.Models
         private readonly ImageList _images;
         private readonly ListModel _listModel = [];
 
+#if IDLE_UPDATE
+        private readonly MessageMergingQueue<UpdateCommand> _updateQueue = new(0);
+#else
         private readonly MessageMergingQueue<UpdateCommand> _updateQueue = new(50);
+#endif
 
         public UpdatingListModel(
             ListView list,
@@ -28,6 +34,10 @@ namespace BossKey.Models
             ModelFactory.WindowScanner.WindowHidden += WindowScanner_WindowHidden;
 
             _updateQueue.OnDequeue += UpdateQueue_OnDequeue;
+
+#if IDLE_UPDATE
+            Application.Idle += Application_Idle;
+#endif
         }
 
         #region Async Event Handlers
@@ -67,6 +77,18 @@ namespace BossKey.Models
         }
 
         #endregion Async Event Handlers
+
+        #region Idle Update
+
+#if IDLE_UPDATE
+        private void Application_Idle(object? sender, EventArgs e)
+        {
+            // 在应用程序空闲时处理更新队列中的所有命令
+            _updateQueue.TriggerDequeue();
+        }
+#endif
+
+        #endregion Idle Update
 
         #region Sync Partial Update
 
