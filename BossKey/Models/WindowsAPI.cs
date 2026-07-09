@@ -289,6 +289,39 @@ namespace BossKey.Models
 
         #endregion
 
+        #region Kernel32.dll / Advapi32.dll P/Invoke
+
+        /// <summary>OpenProcess: PROCESS_QUERY_INFORMATION</summary>
+        public const uint PROCESS_QUERY_INFORMATION = 0x0400;
+
+        /// <summary>OpenProcessToken: TOKEN_QUERY</summary>
+        public const uint TOKEN_QUERY = 0x0008;
+
+        /// <summary>TOKEN_INFORMATION_CLASS: TokenElevation</summary>
+        public const uint TOKEN_ELEVATION = 20;
+
+        [LibraryImport("kernel32.dll", SetLastError = true)]
+        public static partial nint OpenProcess(uint dwDesiredAccess, [MarshalAs(UnmanagedType.Bool)] bool bInheritHandle, uint dwProcessId);
+
+        [LibraryImport("advapi32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        public static partial bool OpenProcessToken(nint ProcessHandle, uint DesiredAccess, out nint TokenHandle);
+
+        [LibraryImport("advapi32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        public static partial bool GetTokenInformation(
+            nint TokenHandle,
+            uint TokenInformationClass,
+            out int TokenInformation,
+            uint TokenInformationLength,
+            out uint ReturnLength);
+
+        [LibraryImport("kernel32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        public static partial bool CloseHandle(nint hObject);
+
+        #endregion
+
         #region Gdi32.dll P/Invoke
 
         [LibraryImport("user32.dll")]
@@ -500,6 +533,16 @@ namespace BossKey.Models
         {
             int errorCode = Marshal.GetLastPInvokeError();
             return errorCode == 0;
+        }
+
+        /// <summary>
+        /// 检查上一次P/Invoke调用是否因权限不足而失败
+        /// </summary>
+        /// <returns></returns>
+        public static bool IsLastAccessDenied()
+        {
+            int errorCode = Marshal.GetLastPInvokeError();
+            return errorCode == 5; // ERROR_ACCESS_DENIED
         }
 
         /// <summary>

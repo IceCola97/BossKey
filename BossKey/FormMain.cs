@@ -44,6 +44,22 @@ namespace BossKey
                     return;
                 }
 
+                // 检查目标窗口是否可以被访问，如果不可以访问则提示用户以管理员身份运行
+                if (!AdminUtils.CanAccess(hWnd))
+                {
+                    MessageBox.Show(
+                        "选择的目标窗口需要管理员权限才能操作，请更换目标或以管理员身份重启当前应用。",
+                        "权限不足",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Warning);
+
+                    LazyCall.Debounce("AccessDeniedClearSelection", 50, () =>
+                    {
+                        Invoke(() => listWindows.SelectedItems.Clear());
+                    });
+                    return;
+                }
+
                 ModelFactory.WindowController.Open(hWnd);
                 SwitchControlPanelEnabled(true);
             }
