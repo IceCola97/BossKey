@@ -11,19 +11,29 @@ namespace BossKey.Models
         /// 将指定窗口的透明度设置为指定值
         /// </summary>
         /// <param name="hWnd">窗口句柄</param>
-        /// <param name="opacity">透明度值，范围为 0-255</param>
-        public static void SetWindowOpacity(nint hWnd, byte opacity)
+        /// <param name="opacity">透明度值，范围为 0-255，null 表示移除透明度设置</param>
+        public static void SetWindowOpacity(nint hWnd, byte? opacity)
         {
-            // 获取当前的扩展样式
+            // 确保 WS_EX_LAYERED 样式
             nint exStyle = WindowsAPI.GetWindowLong(hWnd, WindowsAPI.WindowLongIndex.ExStyle);
-
-            // 添加 WS_EX_LAYERED 样式
             nint newExStyle = (nint)((uint)exStyle | (uint)WindowsAPI.WindowExStyle.Layered);
             WindowsAPI.SetWindowLong(hWnd, WindowsAPI.WindowLongIndex.ExStyle, newExStyle);
             WindowsAPI.AssertLastError();
 
-            // 设置透明度（bAlpha: 0=全透明, 255=不透明）
-            WindowsAPI.SetLayeredWindowAttributes(hWnd, 0, opacity, WindowsAPI.LayeredWindowAttribute.Alpha);
+            // 获取当前的 LayeredWindowAttributes，保留另一属性的原值
+            WindowsAPI.GetLayeredWindowAttributes(hWnd, out uint crKey, out byte alpha, out var flags);
+
+            if (opacity.HasValue)
+            {
+                flags |= WindowsAPI.LayeredWindowAttribute.Alpha;
+                alpha = opacity.Value;
+            }
+            else
+            {
+                flags &= ~WindowsAPI.LayeredWindowAttribute.Alpha;
+            }
+
+            WindowsAPI.SetLayeredWindowAttributes(hWnd, crKey, alpha, flags);
             WindowsAPI.AssertLastError();
         }
 
@@ -160,6 +170,37 @@ namespace BossKey.Models
             {
                 throw;
             }
+        }
+
+        /// <summary>
+        /// 将指定窗口的透明色设置为指定颜色。<br/>
+        /// 传入 <see langword="null"/> 则移除透明色。
+        /// </summary>
+        /// <param name="hWnd">窗口句柄</param>
+        /// <param name="colorKey">透明色（COLORREF 格式: 0x00BBGGRR），null 表示移除透明色</param>
+        public static void SetWindowTransparentColor(nint hWnd, int? colorKey)
+        {
+            // 确保 WS_EX_LAYERED 样式
+            nint exStyle = WindowsAPI.GetWindowLong(hWnd, WindowsAPI.WindowLongIndex.ExStyle);
+            nint newExStyle = (nint)((uint)exStyle | (uint)WindowsAPI.WindowExStyle.Layered);
+            WindowsAPI.SetWindowLong(hWnd, WindowsAPI.WindowLongIndex.ExStyle, newExStyle);
+            WindowsAPI.AssertLastError();
+
+            // 获取当前的 LayeredWindowAttributes，保留另一属性的原值
+            WindowsAPI.GetLayeredWindowAttributes(hWnd, out uint crKey, out byte alpha, out var flags);
+
+            if (colorKey.HasValue)
+            {
+                flags |= WindowsAPI.LayeredWindowAttribute.ColorKey;
+                crKey = (uint)colorKey.Value;
+            }
+            else
+            {
+                flags &= ~WindowsAPI.LayeredWindowAttribute.ColorKey;
+            }
+
+            WindowsAPI.SetLayeredWindowAttributes(hWnd, crKey, alpha, flags);
+            WindowsAPI.AssertLastError();
         }
 
         /// <summary>

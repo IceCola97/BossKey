@@ -59,6 +59,12 @@ namespace BossKey.Models
             set => CheckWindowAlive().TopMost = value;
         }
 
+        public int? TransparentColor
+        {
+            get => CheckWindowAlive().TransparentColor;
+            set => CheckWindowAlive().TransparentColor = value;
+        }
+
         public void ReapplyProperties()
         {
             CheckWindowAlive().ReapplyProperties();

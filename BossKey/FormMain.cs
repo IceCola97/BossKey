@@ -56,6 +56,7 @@ namespace BossKey
             checkAutoHide.Enabled = enabled;
             checkVolume.Enabled = enabled;
             checkTopmost.Enabled = enabled;
+            checkTransparentColor.Enabled = enabled;
 
             if (enabled)
             {
@@ -73,9 +74,13 @@ namespace BossKey
             checkAutoHide.Checked = false;
             checkVolume.Checked = false;
             checkTopmost.Checked = false;
+            checkTransparentColor.Checked = false;
             trackOpacity.Value = trackOpacity.Maximum;
             trackVolume.Value = trackVolume.Maximum;
             hotkeyAutoHide.Hotkey = Keys.None;
+            colorPickerButton.SelectedColor = Color.White;
+            labelOpacity.Text = "100%";
+            labelVolume.Text = "100%";
         }
 
         private void LoadControlPanelState()
@@ -87,12 +92,15 @@ namespace BossKey
                 checkAutoHide.Checked = controller.AutoHideHotkey.HasValue;
                 checkVolume.Checked = controller.Volume.HasValue;
                 checkTopmost.Checked = controller.TopMost;
+                checkTransparentColor.Checked = controller.TransparentColor.HasValue;
                 trackOpacity.Value = controller.Opacity ?? trackOpacity.Maximum;
                 trackVolume.Value = controller.Volume.HasValue
                     ? (int)(controller.Volume.Value * 100)
                     : trackVolume.Maximum;
                 (hotkeyAutoHide.ModifierKeys, hotkeyAutoHide.BaseKey) =
                     controller.AutoHideHotkey?.NormalizeLeft() ?? Hotkey.None;
+                colorPickerButton.SelectedColor = controller.TransparentColor.HasValue
+                    ? FromColorBGR(controller.TransparentColor.Value) : Color.White;
                 labelOpacity.Text = $"{trackOpacity.Value / 255.0 * 100:F0}%";
                 labelVolume.Text = $"{trackVolume.Value}%";
             }
@@ -213,6 +221,39 @@ namespace BossKey
             }
         }
 
+        private void SwitchTransparentColorPanelEnabled(bool enabled)
+        {
+            colorPickerButton.Enabled = enabled;
+
+            LazySaveTransparentColorPanelState();
+        }
+
+        private void LazySaveTransparentColorPanelState(int duration = 300)
+        {
+            LazyCall.Debounce("SaveTransparentColorPanelState", duration, () => Invoke(SaveTransparentColorPanelState));
+        }
+
+        private void SaveTransparentColorPanelState()
+        {
+            var windowController = ModelFactory.WindowController;
+
+            if (windowController.Current == 0)
+            {
+                return;
+            }
+
+            try
+            {
+                windowController.TransparentColor = checkTransparentColor.Checked
+                    ? ToColorBGR(colorPickerButton.SelectedColor) : null;
+            }
+            catch (Exception ex)
+            {
+                SyncBackWindowControllerSelection();
+                ReportError(ex.Message, "更改透明颜色失败");
+            }
+        }
+
         private void SwitchTopMostPanelEnabled(bool enabled)
         {
             LazySaveTopMostPanelState();
@@ -246,6 +287,19 @@ namespace BossKey
         private static void ReportError(string message, string title)
         {
             MessageBox.Show(message, title, MessageBoxButtons.OK, MessageBoxIcon.Error, default, MessageBoxOptions.ServiceNotification);
+        }
+
+        private static int ToColorBGR(Color color)
+        {
+            return (color.B << 16) | (color.G << 8) | color.R;
+        }
+
+        private static Color FromColorBGR(int bgr)
+        {
+            int r = bgr & 0xFF;
+            int g = (bgr >> 8) & 0xFF;
+            int b = (bgr >> 16) & 0xFF;
+            return Color.FromArgb(r, g, b);
         }
 
         #endregion Methods
@@ -309,6 +363,11 @@ namespace BossKey
             SwitchTopMostPanelEnabled(checkTopmost.Checked);
         }
 
+        private void CheckTransparentColor_CheckedChanged(object sender, EventArgs e)
+        {
+            SwitchTransparentColorPanelEnabled(checkTransparentColor.Checked);
+        }
+
         private void TrackOpacity_Scroll(object sender, EventArgs e)
         {
             labelOpacity.Text = $"{trackOpacity.Value / 255.0 * 100:F0}%";
@@ -324,6 +383,11 @@ namespace BossKey
         {
             labelVolume.Text = $"{trackVolume.Value}%";
             LazySaveVolumePanelState();
+        }
+
+        private void ColorPickerButton_SelectedColorChanged(object sender, EventArgs e)
+        {
+            LazySaveTransparentColorPanelState();
         }
 
         private void FormMain_KeyUp(object sender, KeyEventArgs e)

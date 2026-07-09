@@ -33,6 +33,11 @@ namespace BossKey.Models
         bool TopMost { get; set; }
 
         /// <summary>
+        /// 当前窗口的透明色，顺序是0xBBGGRR，null 表示不设置
+        /// </summary>
+        int? TransparentColor { get; set; }
+
+        /// <summary>
         /// 重新应用当前窗口的属性设置（透明度、音量、置顶状态等）到窗口上
         /// </summary>
         void ReapplyProperties();

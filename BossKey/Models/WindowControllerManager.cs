@@ -117,7 +117,7 @@ namespace BossKey.Models
             private int _referenceCount = 1;
 
             public IFixedWindowController Controller { get; } = controller
-                    ?? throw new ArgumentNullException(nameof(controller));
+                ?? throw new ArgumentNullException(nameof(controller));
 
             public int ReferenceCount => _referenceCount;
 

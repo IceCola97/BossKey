@@ -10,6 +10,7 @@ namespace BossKey.Models
         private Hotkey? _autoHideHotkey;
         private float? _volume;
         private bool _topMost;
+        private int? _transparentColor;
         private nint _processId;
         private volatile Action? _hotkeyReleaseAction = null;
 
@@ -36,13 +37,17 @@ namespace BossKey.Models
             nint exStyle = WindowsAPI.GetWindowLong(_hWnd, WindowsAPI.WindowLongIndex.ExStyle);
             _topMost = ((uint)exStyle & (uint)WindowsAPI.WindowExStyle.TopMost) != 0;
 
-            // 动态获取当前窗口的透明度
+            // 动态获取当前窗口的透明度和透明色
             if (((uint)exStyle & (uint)WindowsAPI.WindowExStyle.Layered) != 0)
             {
-                if (WindowsAPI.GetLayeredWindowAttributes(_hWnd, out _, out byte alpha, out _)
+                if (WindowsAPI.GetLayeredWindowAttributes(_hWnd, out uint colorKey, out byte alpha, out var flags)
                     && alpha != 255)
                 {
-                    _opacity = alpha;
+                    if (flags.HasFlag(WindowsAPI.LayeredWindowAttribute.Alpha))
+                        _opacity = alpha;
+
+                    if (flags.HasFlag(WindowsAPI.LayeredWindowAttribute.ColorKey))
+                        _transparentColor = (int)colorKey;
                 }
             }
 
@@ -86,6 +91,7 @@ namespace BossKey.Models
 
             WindowControllerCore.SetWindowOpacity(_hWnd, _opacity);
             WindowControllerCore.SetWindowTopMost(_hWnd, _topMost);
+            WindowControllerCore.SetWindowTransparentColor(_hWnd, _transparentColor);
         }
 
         public nint Current => _hWnd;
@@ -102,7 +108,7 @@ namespace BossKey.Models
                     return;
                 }
 
-                WindowControllerCore.SetWindowOpacity(_hWnd, value ?? 255);
+                WindowControllerCore.SetWindowOpacity(_hWnd, value);
                 _opacity = value;
             }
         }
@@ -218,6 +224,23 @@ namespace BossKey.Models
 
                 WindowControllerCore.SetWindowTopMost(_hWnd, value);
                 _topMost = value;
+            }
+        }
+
+        public int? TransparentColor
+        {
+            get => CheckWindowAlive(_transparentColor);
+            set
+            {
+                CheckWindowAlive();
+
+                if (_transparentColor == value)
+                {
+                    return;
+                }
+
+                WindowControllerCore.SetWindowTransparentColor(_hWnd, value);
+                _transparentColor = value;
             }
         }
 

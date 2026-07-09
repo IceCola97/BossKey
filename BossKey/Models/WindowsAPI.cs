@@ -289,6 +289,19 @@ namespace BossKey.Models
 
         #endregion
 
+        #region Gdi32.dll P/Invoke
+
+        [LibraryImport("user32.dll")]
+        public static partial nint GetDC(nint hWnd);
+
+        [LibraryImport("user32.dll")]
+        public static partial int ReleaseDC(nint hWnd, nint hDC);
+
+        [LibraryImport("gdi32.dll")]
+        public static partial uint GetPixel(nint hdc, int x, int y);
+
+        #endregion
+
         #region Structs
 
         [StructLayout(LayoutKind.Sequential)]

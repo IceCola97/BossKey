@@ -37,6 +37,7 @@ namespace BossKey
             imageWindow = new ImageList(components);
             textSearch = new TextBox();
             groupConf = new GroupBox();
+            colorPickerButton = new ColorPickerButton();
             checkTopmost = new CheckBox();
             labelVolume = new Label();
             labelOpacity = new Label();
@@ -45,6 +46,7 @@ namespace BossKey
             hotkeyAutoHide = new HotkeyBox();
             checkAutoHide = new CheckBox();
             trackOpacity = new TrackBar();
+            checkTransparentColor = new CheckBox();
             checkOpacity = new CheckBox();
             timerLock = new System.Windows.Forms.Timer(components);
             groupConf.SuspendLayout();
@@ -84,6 +86,7 @@ namespace BossKey
             // 
             // groupConf
             // 
+            groupConf.Controls.Add(colorPickerButton);
             groupConf.Controls.Add(checkTopmost);
             groupConf.Controls.Add(labelVolume);
             groupConf.Controls.Add(labelOpacity);
@@ -92,6 +95,7 @@ namespace BossKey
             groupConf.Controls.Add(hotkeyAutoHide);
             groupConf.Controls.Add(checkAutoHide);
             groupConf.Controls.Add(trackOpacity);
+            groupConf.Controls.Add(checkTransparentColor);
             groupConf.Controls.Add(checkOpacity);
             groupConf.Location = new Point(443, 12);
             groupConf.Name = "groupConf";
@@ -99,6 +103,17 @@ namespace BossKey
             groupConf.TabIndex = 2;
             groupConf.TabStop = false;
             groupConf.Text = "窗口配置";
+            // 
+            // colorPickerButton
+            // 
+            colorPickerButton.Location = new Point(27, 283);
+            colorPickerButton.Name = "colorPickerButton";
+            colorPickerButton.SelectedColor = Color.White;
+            colorPickerButton.Size = new Size(167, 28);
+            colorPickerButton.TabIndex = 9;
+            colorPickerButton.TabStop = false;
+            colorPickerButton.Visible = false;
+            colorPickerButton.SelectedColorChanged += ColorPickerButton_SelectedColorChanged;
             // 
             // checkTopmost
             // 
@@ -193,6 +208,18 @@ namespace BossKey
             trackOpacity.Value = 255;
             trackOpacity.Scroll += TrackOpacity_Scroll;
             // 
+            // checkTransparentColor
+            // 
+            checkTransparentColor.AutoSize = true;
+            checkTransparentColor.Location = new Point(6, 253);
+            checkTransparentColor.Name = "checkTransparentColor";
+            checkTransparentColor.Size = new Size(121, 24);
+            checkTransparentColor.TabIndex = 0;
+            checkTransparentColor.Text = "启用遮罩颜色";
+            checkTransparentColor.UseVisualStyleBackColor = true;
+            checkTransparentColor.Visible = false;
+            checkTransparentColor.CheckedChanged += CheckTransparentColor_CheckedChanged;
+            // 
             // checkOpacity
             // 
             checkOpacity.AutoSize = true;
@@ -218,6 +245,7 @@ namespace BossKey
             Controls.Add(groupConf);
             Controls.Add(textSearch);
             Controls.Add(listWindows);
+            FormBorderStyle = FormBorderStyle.FixedSingle;
             Icon = (Icon)resources.GetObject("$this.Icon");
             KeyPreview = true;
             MaximizeBox = false;
@@ -252,5 +280,8 @@ namespace BossKey
         private ImageList imageWindow;
         private ColumnHeader columnHeader;
         private System.Windows.Forms.Timer timerLock;
+        private CheckBox checkTransparentColor;
+        private ColorDialog colorDialog;
+        private ColorPickerButton colorPickerButton;
     }
 }
