@@ -1,4 +1,6 @@
-﻿using BossKey.Utils;
+﻿#define FULL_ASYNC
+
+using BossKey.Utils;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -95,11 +97,19 @@ namespace BossKey.Models
         {
             var evt = ObtainEvent(false);
             nint syncResult = 0;
+            int evtState = 0;
             int state = 0;
 
             Task.Run(() =>
             {
-                evt.Set();
+                if (Interlocked.CompareExchange(ref evtState, 1, 0) != 0)
+                {
+                    RecycleEvent(evt);
+                }
+                else
+                {
+                    evt.Set();
+                }
 
                 if (SendMessageTimeout(
                     hWnd,
@@ -128,10 +138,13 @@ namespace BossKey.Models
                 }
             });
 
-            evt.WaitOne();
-            RecycleEvent(evt);
+            evt.WaitOne(6);
 
-            Thread.Sleep(0);
+            if (Interlocked.CompareExchange(ref evtState, 2, 0) != 0)
+            {
+                RecycleEvent(evt);
+                Thread.Sleep(0);
+            }
 
             if (Interlocked.CompareExchange(ref state, 2, 0) != 0)
             {
