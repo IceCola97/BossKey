@@ -421,7 +421,15 @@ namespace BossKey
             // 对于一些窗口可能会反复清空属性，所以为了优化体验，对于当前窗口将使用定时器定期刷新属性
             if (ModelFactory.WindowController.Current != 0)
             {
-                ModelFactory.WindowController.ReapplyProperties();
+                try
+                {
+                    ModelFactory.WindowController.ReapplyProperties();
+                }
+                catch
+                {
+                    // 由于是自动操作，所以不提示错误，只是静默同步回控件状态即可
+                    SyncBackWindowControllerSelection();
+                }
             }
         }
 
