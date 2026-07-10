@@ -6,37 +6,42 @@ using System.Text;
 
 namespace BossKey.Utils
 {
-    internal sealed class MessageMergingQueue<T>(int debounceInterval = 0)
+    internal sealed class MessageMergingQueue<T>(int debounceInterval = 0, bool dequeueAll = false)
     {
         private readonly ConcurrentQueue<T> _queue = [];
         private readonly string _siteKey = Guid.NewGuid().ToString();
         private readonly int _debounceInterval = debounceInterval;
+        private readonly bool _dequeueAll = dequeueAll;
 
         public event MessageMergingDequeueEventHandler<T>? OnDequeue;
 
+        private IEnumerable<T> MessageGenerator()
+        {
+            while (_queue.TryDequeue(out var item))
+            {
+                yield return item;
+            }
+        }
+
         private void DispatchDequeueEvent()
         {
-            T[] resultArray;
+            IEnumerable<T> resultSet;
 
             if (_queue.IsEmpty)
             {
-                resultArray = [];
+                resultSet = (T[])[];
             }
             else
             {
-                var items = new List<T>();
+                resultSet = MessageGenerator();
 
-                while (_queue.TryDequeue(out var item))
-                {
-                    items.Add(item);
-                }
-
-                resultArray = [.. items];
+                if (_dequeueAll)
+                    resultSet = (T[])[.. resultSet];
             }
 
             try
             {
-                OnDequeue?.Invoke(resultArray);
+                OnDequeue?.Invoke(resultSet);
             }
             catch (Exception ex)
             {
@@ -59,7 +64,17 @@ namespace BossKey.Utils
 
             DispatchDequeueEvent();
         }
+
+        public static bool IsEmptyItems(IEnumerable<T> items)
+        {
+            return items switch
+            {
+                null => true,
+                ICollection<T> collection => collection.Count == 0,
+                _ => false,
+            };
+        }
     }
 
-    internal delegate void MessageMergingDequeueEventHandler<T>(T[] items);
+    internal delegate void MessageMergingDequeueEventHandler<T>(IEnumerable<T> items);
 }

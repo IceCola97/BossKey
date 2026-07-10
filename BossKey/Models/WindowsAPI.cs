@@ -189,7 +189,7 @@ namespace BossKey.Models
             AbortIfHung = 0x0002,
             /// <summary>目标窗口未挂起时不等待超时</summary>
             NoTimeoutIfNotHung = 0x0008,
-            /// <summary>超时或挂起时设置 LastError 为 ERROR_TIMEOUT</summary>
+            /// <summary>如果正在处理消息时，目标窗口被销毁或自己的线程死亡，则函数应返回 0。</summary>
             ErrorOnExit = 0x0020
         }
 

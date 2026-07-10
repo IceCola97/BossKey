@@ -2,7 +2,9 @@
 
 using BossKey.Utils;
 using System;
+using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Net.NetworkInformation;
 using System.Text;
 using static BossKey.Models.WindowsAPI;
@@ -12,6 +14,8 @@ namespace BossKey.Models
 {
     internal sealed class UpdatingListModel
     {
+        private const int MAX_IDLE_TICKS = 10;
+
         private readonly ListView _list;
         private readonly ImageList _images;
         private readonly ListModel _listModel = [];
@@ -30,10 +34,13 @@ namespace BossKey.Models
             _list = list;
             _images = images;
 
+            EnableDoubleBuffered(list);
+
             ModelFactory.WindowScanner.WindowCreated += WindowScanner_WindowCreated;
             ModelFactory.WindowScanner.WindowDestroyed += WindowScanner_WindowDestroyed;
             ModelFactory.WindowScanner.WindowShown += WindowScanner_WindowShown;
             ModelFactory.WindowScanner.WindowHidden += WindowScanner_WindowHidden;
+            IconCache.WindowIconUpdated += IconCache_WindowIconUpdated;
 
             _updateQueue.OnDequeue += UpdateQueue_OnDequeue;
 
@@ -50,6 +57,19 @@ namespace BossKey.Models
             {
                 Type = type,
                 Window = window,
+            });
+        }
+
+        private void PostUpdateCommand(UpdateCommandType type, nint hWnd, nint hIcon)
+        {
+            _updateQueue.Enqueue(new UpdateCommand
+            {
+                Type = type,
+                Window = new ScannedWindow
+                {
+                    Handle = hWnd,
+                },
+                IconHandle = hIcon,
             });
         }
 
@@ -73,7 +93,12 @@ namespace BossKey.Models
             PostUpdateCommand(UpdateCommandType.WindowHidden, window);
         }
 
-        private void UpdateQueue_OnDequeue(UpdateCommand[] items)
+        private void IconCache_WindowIconUpdated(nint hWnd, nint hIcon)
+        {
+            PostUpdateCommand(UpdateCommandType.WindowIconUpdated, hWnd, hIcon);
+        }
+
+        private void UpdateQueue_OnDequeue(IEnumerable<UpdateCommand> items)
         {
             _list.Invoke(() => PerformWindowChanged(items));
         }
@@ -94,10 +119,12 @@ namespace BossKey.Models
 
         #region Sync Partial Update
 
-        private void PerformWindowChanged(UpdateCommand[] items)
+        private void PerformWindowChanged(IEnumerable<UpdateCommand> items)
         {
-            if (items.Length == 0)
+            if (MessageMergingQueue<UpdateCommand>.IsEmptyItems(items))
                 return;
+
+            int start = Environment.TickCount;
 
             _list.BeginUpdate();
 
@@ -117,6 +144,15 @@ namespace BossKey.Models
                     case UpdateCommandType.WindowHidden:
                         PerformWindowHidden(item.Window);
                         break;
+                    case UpdateCommandType.WindowIconUpdated:
+                        PerformWindowIconUpdated(item.Window, item.IconHandle);
+                        break;
+                }
+
+                if (Environment.TickCount - start > MAX_IDLE_TICKS)
+                {
+                    // 如果处理时间超过最大空闲时间，则中断处理，等待下一次空闲时继续处理
+                    break;
                 }
             }
 
@@ -162,6 +198,11 @@ namespace BossKey.Models
         private void PerformWindowHidden(ScannedWindow window)
         {
             PerformWindowUpdateState(window);
+        }
+
+        private void PerformWindowIconUpdated(ScannedWindow window, nint iconHandle)
+        {
+            UpdateWindowIcon(window.Handle, iconHandle);
         }
 
         private void PerformWindowUpdateState(ScannedWindow window)
@@ -233,51 +274,32 @@ namespace BossKey.Models
 
         #region Helpers
 
-        private static string BuildIconKey(ScannedWindow window)
+        private static string BuildIconKey(nint hWnd)
         {
-            return window.Handle.ToString("X");
+            return hWnd.ToString("X");
         }
 
-        private static nint SendMessage0(nint hWnd, WindowMessage msg, nint wParam, nint lParam)
+        private void UpdateWindowIcon(nint hWnd, nint hIcon)
         {
-            nint lResult = SendMessageTimeout(
-                hWnd, WindowMessage.GetIcon,
-                wParam, lParam,
-                SendMessageTimeoutFlags.AbortIfHung | SendMessageTimeoutFlags.ErrorOnExit,
-                0, out nint result
-            );
-
-            if (lResult == 0)
+            if (hIcon != 0)
             {
-                return 0;
+                try
+                {
+                    using var icon = Icon.FromHandle(hIcon);
+                    string key = BuildIconKey(hWnd);
+                    _images.Images.RemoveByKey(key);
+                    _images.Images.Add(key, icon);
+                }
+                catch
+                {
+                    // 图标句柄无效时跳过，imageKey 保持 null
+                }
             }
-
-            return result;
         }
 
         private string? GetWindowIcon(ScannedWindow window)
         {
-            nint hIcon = SendMessage0(window.Handle, WindowMessage.GetIcon, (nint)IconSize.Small2, 0);
-
-            if (hIcon == 0)
-            {
-                hIcon = SendMessage0(window.Handle, WindowMessage.GetIcon, (nint)IconSize.Small, 0);
-
-                if (hIcon == 0)
-                {
-                    hIcon = SendMessage0(window.Handle, WindowMessage.GetIcon, (nint)IconSize.Big, 0);
-                }
-            }
-
-            if (hIcon == 0)
-            {
-                hIcon = GetClassLong(window.Handle, ClassLongIndex.HIconSm);
-
-                if (hIcon == 0)
-                {
-                    hIcon = GetClassLong(window.Handle, ClassLongIndex.HIcon);
-                }
-            }
+            nint hIcon = IconCache.GetWindowIcon(window.Handle);
 
             string? key = null;
 
@@ -286,7 +308,7 @@ namespace BossKey.Models
                 try
                 {
                     using var icon = Icon.FromHandle(hIcon);
-                    key = BuildIconKey(window);
+                    key = BuildIconKey(window.Handle);
                     _images.Images.Add(key, icon);
                 }
                 catch
@@ -343,6 +365,13 @@ namespace BossKey.Models
             }
         }
 
+        private static void EnableDoubleBuffered(Control control)
+        {
+            typeof(Control).GetProperty("DoubleBuffered",
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)
+                ?.SetValue(control, true, null);
+        }
+
         #endregion Helpers
 
         #region UpdateCommand
@@ -352,6 +381,8 @@ namespace BossKey.Models
             public UpdateCommandType Type { get; init; }
 
             public ScannedWindow Window { get; init; }
+
+            public nint IconHandle { get; init; }
         }
 
         private enum UpdateCommandType
@@ -360,6 +391,7 @@ namespace BossKey.Models
             WindowDestroyed,
             WindowShown,
             WindowHidden,
+            WindowIconUpdated,
         }
 
         #endregion UpdateCommand
