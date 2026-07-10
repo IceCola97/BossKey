@@ -177,6 +177,22 @@ namespace BossKey.Models
             RootOwner = 3
         }
 
+        /// <summary>SendMessageTimeout fuFlags 参数</summary>
+        [Flags]
+        public enum SendMessageTimeoutFlags : uint
+        {
+            /// <summary>默认行为</summary>
+            Normal = 0x0000,
+            /// <summary>阻塞等待消息处理完成才返回</summary>
+            Block = 0x0001,
+            /// <summary>目标窗口挂起时立即返回</summary>
+            AbortIfHung = 0x0002,
+            /// <summary>目标窗口未挂起时不等待超时</summary>
+            NoTimeoutIfNotHung = 0x0008,
+            /// <summary>超时或挂起时设置 LastError 为 ERROR_TIMEOUT</summary>
+            ErrorOnExit = 0x0020
+        }
+
         #endregion
 
         #region Special HWND Values
@@ -274,6 +290,9 @@ namespace BossKey.Models
 
         [LibraryImport("user32.dll", EntryPoint = "SendMessageW", SetLastError = true)]
         public static partial nint SendMessage(nint hWnd, WindowMessage Msg, nint wParam, nint lParam);
+
+        [LibraryImport("user32.dll", EntryPoint = "SendMessageTimeoutW", SetLastError = true)]
+        public static partial nint SendMessageTimeout(nint hWnd, WindowMessage Msg, nint wParam, nint lParam, SendMessageTimeoutFlags fuFlags, uint uTimeout, out nint lpdwResult);
 
         [LibraryImport("user32.dll", EntryPoint = "GetClassLongPtrW", SetLastError = true)]
         public static partial nint GetClassLong(nint hWnd, ClassLongIndex nIndex);

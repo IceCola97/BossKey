@@ -3,7 +3,9 @@
 using BossKey.Utils;
 using System;
 using System.Collections.Generic;
+using System.Net.NetworkInformation;
 using System.Text;
+using static BossKey.Models.WindowsAPI;
 using ListModel = BossKey.Models.SortedListModel<BossKey.Models.ScannedWindow, System.Windows.Forms.ListViewItem>;
 
 namespace BossKey.Models
@@ -236,22 +238,44 @@ namespace BossKey.Models
             return window.Handle.ToString("X");
         }
 
+        private static nint SendMessage0(nint hWnd, WindowMessage msg, nint wParam, nint lParam)
+        {
+            nint lResult = SendMessageTimeout(
+                hWnd, WindowMessage.GetIcon,
+                wParam, lParam,
+                SendMessageTimeoutFlags.AbortIfHung | SendMessageTimeoutFlags.ErrorOnExit,
+                0, out nint result
+            );
+
+            if (lResult == 0)
+            {
+                return 0;
+            }
+
+            return result;
+        }
+
         private string? GetWindowIcon(ScannedWindow window)
         {
-            nint hIcon = WindowsAPI.SendMessage(window.Handle, WindowsAPI.WindowMessage.GetIcon, (nint)WindowsAPI.IconSize.Small2, 0);
+            nint hIcon = SendMessage0(window.Handle, WindowMessage.GetIcon, (nint)IconSize.Small2, 0);
 
             if (hIcon == 0)
             {
-                hIcon = WindowsAPI.SendMessage(window.Handle, WindowsAPI.WindowMessage.GetIcon, (nint)WindowsAPI.IconSize.Small, 0);
+                hIcon = SendMessage0(window.Handle, WindowMessage.GetIcon, (nint)IconSize.Small, 0);
+
+                if (hIcon == 0)
+                {
+                    hIcon = SendMessage0(window.Handle, WindowMessage.GetIcon, (nint)IconSize.Big, 0);
+                }
             }
 
             if (hIcon == 0)
             {
-                hIcon = WindowsAPI.GetClassLong(window.Handle, WindowsAPI.ClassLongIndex.HIconSm);
+                hIcon = GetClassLong(window.Handle, ClassLongIndex.HIconSm);
 
                 if (hIcon == 0)
                 {
-                    hIcon = WindowsAPI.GetClassLong(window.Handle, WindowsAPI.ClassLongIndex.HIcon);
+                    hIcon = GetClassLong(window.Handle, ClassLongIndex.HIcon);
                 }
             }
 
