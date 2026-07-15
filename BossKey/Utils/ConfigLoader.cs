@@ -44,6 +44,8 @@ namespace BossKey.Utils
                 // 处理字段
                 foreach (FieldInfo field in type.GetFields(MemberFlags))
                 {
+                    if (field.IsDefined(typeof(CompilerGeneratedAttribute)))
+                        continue;
                     if (field.IsDefined(typeof(NotConfigAttribute)))
                         continue;
 
@@ -57,6 +59,8 @@ namespace BossKey.Utils
                 foreach (PropertyInfo prop in type.GetProperties(MemberFlags))
                 {
                     if (!prop.CanRead || !prop.CanWrite)
+                        continue;
+                    if (prop.IsDefined(typeof(CompilerGeneratedAttribute)))
                         continue;
                     if (prop.IsDefined(typeof(NotConfigAttribute)))
                         continue;
@@ -84,6 +88,14 @@ namespace BossKey.Utils
         /// <returns>保存成功返回 true，失败返回 false</returns>
         public static bool Save<T>(string path, T o)
         {
+            // 要确保保存目录存在
+            string? dir = Path.GetDirectoryName(path);
+
+            if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+            {
+                Directory.CreateDirectory(dir);
+            }
+
             try
             {
                 using var stream = new MemoryStream();
@@ -96,6 +108,8 @@ namespace BossKey.Utils
                 // 处理字段
                 foreach (FieldInfo field in type.GetFields(MemberFlags))
                 {
+                    if (field.IsDefined(typeof(CompilerGeneratedAttribute)))
+                        continue;
                     if (field.IsDefined(typeof(NotConfigAttribute)))
                         continue;
 
@@ -106,7 +120,9 @@ namespace BossKey.Utils
                 // 处理可读写属性（自动属性）
                 foreach (PropertyInfo prop in type.GetProperties(MemberFlags))
                 {
-                    if (!prop.CanRead)
+                    if (!prop.CanRead || !prop.CanWrite)
+                        continue;
+                    if (prop.IsDefined(typeof(CompilerGeneratedAttribute)))
                         continue;
                     if (prop.IsDefined(typeof(NotConfigAttribute)))
                         continue;
