@@ -7,6 +7,16 @@ namespace BossKey.Models
     internal interface IWindowController : IFixedWindowController
     {
         /// <summary>
+        /// 当窗口被打开时触发，参数为新打开的窗口句柄
+        /// </summary>
+        event Action<nint>? WindowOpened;
+
+        /// <summary>
+        /// 当窗口被关闭时触发，参数为旧的窗口句柄
+        /// </summary>
+        event Action<nint>? WindowClosed;
+
+        /// <summary>
         /// 打开指定句柄的窗口<br/>
         /// 在打开新的窗口前必须关闭旧的窗口
         /// </summary>

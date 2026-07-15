@@ -2,6 +2,7 @@
 using BossKey.Utils;
 using System;
 using System.Collections.Generic;
+using System.Reflection.Metadata;
 using System.Text;
 
 namespace BossKey.Models
@@ -36,7 +37,7 @@ namespace BossKey.Models
                         throw new SystemException("更换热键绑定窗口失败");
                     }
 
-                    _hotkeys[hotkey] = new HotkeyRegistration(id, hotkey, registration.Callback);
+                    _hotkeys[hotkey] = new HotkeyRegistration(id, registration.Owner, hotkey, registration.Callback);
                 }
             }
         }
@@ -76,7 +77,7 @@ namespace BossKey.Models
             return true;
         }
 
-        public bool RegisterHotkey(Hotkey hotkey, HotkeyCallback callback)
+        public bool RegisterHotkey(IHotkeyOwner owner, Hotkey hotkey, HotkeyCallback callback)
         {
             nint handle = _windowHandle;
 
@@ -99,6 +100,11 @@ namespace BossKey.Models
             {
                 handle = _windowHandle;
 
+                if (handle == 0)
+                {
+                    throw new ArgumentException("热键管理器还没有绑定窗口，无法注册热键。", nameof(hotkey));
+                }
+
                 if (_hotkeys.ContainsKey(hotkey))
                 {
                     return false;
@@ -109,7 +115,7 @@ namespace BossKey.Models
                     return false;
                 }
 
-                _hotkeys[hotkey] = new HotkeyRegistration(id, hotkey, callback);
+                _hotkeys[hotkey] = new HotkeyRegistration(id, owner, hotkey, callback);
                 return true;
             }
         }
@@ -133,6 +139,11 @@ namespace BossKey.Models
             {
                 handle = _windowHandle;
 
+                if (handle == 0)
+                {
+                    throw new ArgumentException("热键管理器还没有绑定窗口，无法注册热键。", nameof(hotkey));
+                }
+
                 if (!_hotkeys.TryGetValue(hotkey, out var registration))
                 {
                     return;
@@ -144,9 +155,38 @@ namespace BossKey.Models
             }
         }
 
+        public IHotkeyOwner? GetHotkeyOwner(Hotkey hotkey)
+        {
+            nint handle = _windowHandle;
+
+            if (handle == 0)
+            {
+                throw new ArgumentException("热键管理器还没有绑定窗口，无法注册热键。", nameof(hotkey));
+            }
+
+            lock (_lock)
+            {
+                handle = _windowHandle;
+
+                if (handle == 0)
+                {
+                    throw new ArgumentException("热键管理器还没有绑定窗口，无法注册热键。", nameof(hotkey));
+                }
+
+                if (!_hotkeys.TryGetValue(hotkey, out var registration))
+                {
+                    return null;
+                }
+
+                return registration.Owner;
+            }
+        }
+
         private readonly struct HotkeyRegistration
         {
             public int Id { get; }
+
+            public IHotkeyOwner Owner { get; }
 
             public Hotkey Hotkey { get; }
 
@@ -154,11 +194,13 @@ namespace BossKey.Models
 
             public HotkeyRegistration(
                 int id,
+                IHotkeyOwner owner,
                 Hotkey hotkey,
                 HotkeyCallback callback
             )
             {
                 Id = id;
+                Owner = owner;
                 Hotkey = hotkey;
                 Callback = callback;
             }

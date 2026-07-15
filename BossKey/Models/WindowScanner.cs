@@ -436,6 +436,12 @@ namespace BossKey.Models
         private string? FilterInternal
             => string.IsNullOrEmpty(_filter) ? null : _filter;
 
+        /// <summary>
+        /// 强制获取指定窗口的扫描信息，即使该窗口不符合过滤条件也会返回一个仅包含句柄的 ScannedWindow 对象。
+        /// </summary>
+        /// <param name="hWnd"></param>
+        /// <param name="filter"></param>
+        /// <returns></returns>
         private static ScannedWindow ForceGetFromHandle(
             nint hWnd,
             string? filter = null
@@ -455,58 +461,18 @@ namespace BossKey.Models
             return result;
         }
 
-        private static ScannedWindow? GetFromHandle(
-            nint hWnd,
-            string? filter = null
-        )
+        /// <summary>
+        /// 获取指定窗口的扫描信息，如果该窗口不符合过滤条件则返回 null。
+        /// </summary>
+        /// <param name="hWnd"></param>
+        /// <param name="filter"></param>
+        /// <returns></returns>
+        private static ScannedWindow? GetFromHandle(nint hWnd, string? filter = null)
         {
             if (!ScannerFilter(hWnd))
                 return null;
 
-            // 获取窗口标题
-            string? title = GetWindowTitle(hWnd);
-
-            if (string.IsNullOrEmpty(title))
-                return null;
-
-            // 检查是否符合过滤条件
-            if (filter is not null)
-            {
-                if (title is null || !title.Contains(filter, StringComparison.OrdinalIgnoreCase))
-                    return null;
-            }
-
-            // 获取进程 ID
-            _ = WindowsAPI.GetWindowThreadProcessId(hWnd, out uint pid);
-
-            if (pid == 0)
-                return null;
-
-            bool visible = WindowsAPI.IsWindowVisible(hWnd);
-
-            return new ScannedWindow
-            {
-                Handle = hWnd,
-                Title = title,
-                ProcessId = (int)pid,
-                Visible = visible,
-            };
-        }
-
-        /// <summary>
-        /// 获取指定窗口的标题文本
-        /// </summary>
-        private static string? GetWindowTitle(nint hWnd)
-        {
-            int length = WindowsAPI.GetWindowTextLength(hWnd);
-
-            if (length == 0)
-                return null;
-
-            // 缓冲区大小：(字符数 + 1) × sizeof(char)
-            byte[] buffer = new byte[(length + 1) * 2];
-            _ = WindowsAPI.GetWindowText(hWnd, buffer, buffer.Length);
-            return Encoding.Unicode.GetString(buffer).TrimEnd('\0');
+            return ScannedWindow.FromHandle(hWnd, filter);
         }
 
         private static bool IsEmptyRect(in WindowsAPI.RECT rect)

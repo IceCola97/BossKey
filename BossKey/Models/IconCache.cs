@@ -7,7 +7,6 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Text;
 using static BossKey.Models.WindowsAPI;
-using static System.Windows.Forms.VisualStyles.VisualStyleElement;
 using Timer = System.Threading.Timer;
 
 namespace BossKey.Models

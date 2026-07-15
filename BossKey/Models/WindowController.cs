@@ -1,6 +1,7 @@
 ﻿using BossKey.Utils;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Text;
 
@@ -10,6 +11,9 @@ namespace BossKey.Models
     {
         private readonly Lock _lock = new();
         private volatile IFixedWindowController? _fixedWindowController = null;
+
+        public event Action<nint>? WindowOpened;
+        public event Action<nint>? WindowClosed;
 
         public nint Current => _fixedWindowController?.Current ?? 0;
 
@@ -74,6 +78,8 @@ namespace BossKey.Models
         {
             CheckFixedWindowController(current);
 
+            nint hWnd;
+
             lock (_lock)
             {
                 if (!ReferenceEquals(current, _fixedWindowController))
@@ -81,10 +87,36 @@ namespace BossKey.Models
                     throw new InvalidOperationException("出现并发关闭操作");
                 }
 
-                nint hWnd = _fixedWindowController.Current;
+                hWnd = _fixedWindowController.Current;
                 ModelFactory.WindowControllerManager.Unregister(_fixedWindowController);
                 _fixedWindowController = null;
-                return hWnd;
+            }
+
+            DispatchWindowClosed(hWnd);
+            return hWnd;
+        }
+
+        private void DispatchWindowOpened(nint hWnd)
+        {
+            try
+            {
+                WindowOpened?.Invoke(hWnd);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error while handling window opened event: {ex}");
+            }
+        }
+
+        private void DispatchWindowClosed(nint hWnd)
+        {
+            try
+            {
+                WindowClosed?.Invoke(hWnd);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error while handling window closed event: {ex}");
             }
         }
 
@@ -111,6 +143,8 @@ namespace BossKey.Models
 
                 _fixedWindowController = ModelFactory.WindowControllerManager.Obtain(hWnd);
             }
+
+            DispatchWindowOpened(hWnd);
         }
     }
 }

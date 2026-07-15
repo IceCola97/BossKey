@@ -335,7 +335,7 @@ namespace BossKey.Models
             string? imageKey = GetWindowIcon(window);
             string title = window.Title ?? string.Empty;
 
-            item.Text = GlobalConfigs.DevelopMode
+            item.Text = GlobalConfigs.Instance.DevelopMode
                  ? string.Format("({0:X08}) {1}", window.Handle, title)
                  : title;
             item.Tag = window;

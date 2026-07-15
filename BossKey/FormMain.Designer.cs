@@ -253,6 +253,7 @@ namespace BossKey
             StartPosition = FormStartPosition.CenterScreen;
             Text = "BossKey";
             TopMost = true;
+            FormClosing += FormMain_FormClosing;
             Load += FormMain_Load;
             KeyUp += FormMain_KeyUp;
             groupConf.ResumeLayout(false);
@@ -281,7 +282,6 @@ namespace BossKey
         private ColumnHeader columnHeader;
         private System.Windows.Forms.Timer timerLock;
         private CheckBox checkTransparentColor;
-        private ColorDialog colorDialog;
         private ColorPickerButton colorPickerButton;
     }
 }

@@ -2,12 +2,15 @@ using BossKey.Utils;
 using System;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Runtime.CompilerServices;
 
 namespace BossKey.Models
 {
-    internal sealed class FixedWindowController : IFixedWindowController, IDisposable
+    internal sealed class FixedWindowController : IFixedWindowController, IHotkeyOwner, IDisposable
     {
         private readonly nint _hWnd;
+        private readonly IWindowState _state;
+
         private byte? _opacity;
         private Hotkey? _autoHideHotkey;
         private float? _volume;
@@ -30,7 +33,15 @@ namespace BossKey.Models
             _processId = 0;
             _topMost = false;
 
+            _state = ModelFactory.WindowStateService.GetState(_hWnd)
+                ?? throw new InvalidOperationException("无法获取窗口状态。");
+
             InitWindowData();
+        }
+
+        ~FixedWindowController()
+        {
+            Dispose();
         }
 
         private void InitWindowData()
@@ -109,6 +120,13 @@ namespace BossKey.Models
             }
         }
 
+        private void SyncPropertiesToState<T>(T value, [CallerMemberName] string? name = null)
+        {
+            ArgumentNullException.ThrowIfNull(name);
+
+            _state.Set(name, value);
+        }
+
         public nint Current => _hWnd;
 
         public byte? Opacity
@@ -125,6 +143,9 @@ namespace BossKey.Models
 
                 WindowControllerCore.SetWindowOpacity(_hWnd, value);
                 _opacity = value;
+
+                if (value.HasValue)
+                    SyncPropertiesToState(value.Value);
             }
         }
 
@@ -146,18 +167,18 @@ namespace BossKey.Models
                 // 如果之前已经注册了热键，那么需要先注销之前的热键
                 if (_autoHideHotkey != null)
                 {
-                    ReleaseHotkey();
+                    ReleaseHotkeyCore();
                 }
 
                 // 如果新的热键有值，那么需要注册新的热键
                 if (value.HasValue)
                 {
-                    if (!hotkeyManager.RegisterHotkey(value.Value, (in _) =>
+                    if (!hotkeyManager.RegisterHotkey(this, value.Value, (in _) =>
                     {
                         if (!WindowsAPI.IsWindow(_hWnd))
                         {
                             // 如果窗口已经不存在，那么需要注销热键
-                            ReleaseHotkey();
+                            ReleaseHotkeyCore();
                             return;
                         }
 
@@ -185,6 +206,9 @@ namespace BossKey.Models
                 }
 
                 _autoHideHotkey = value;
+
+                if (value.HasValue)
+                    SyncPropertiesToState(value.Value);
 
                 var windowControllerManager = ModelFactory.WindowControllerManager;
 
@@ -222,6 +246,9 @@ namespace BossKey.Models
                 }
 
                 _volume = value;
+
+                if (value.HasValue)
+                    SyncPropertiesToState(value.Value);
             }
         }
 
@@ -256,18 +283,27 @@ namespace BossKey.Models
 
                 WindowControllerCore.SetWindowTransparentColor(_hWnd, value);
                 _transparentColor = value;
+
+                if (value.HasValue)
+                    SyncPropertiesToState(value.Value);
             }
         }
 
-        private void ReleaseHotkey()
+        private void ReleaseHotkeyCore()
         {
             var hotkeyReleaseAction = Interlocked.Exchange(ref _hotkeyReleaseAction, null);
             hotkeyReleaseAction?.Invoke();
         }
 
+        public void ReleaseHotkey()
+        {
+            AutoHideHotkey = null;
+        }
+
         public void Dispose()
         {
-            ReleaseHotkey();
+            ReleaseHotkeyCore();
+            GC.SuppressFinalize(this);
         }
     }
 }

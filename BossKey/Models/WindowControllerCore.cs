@@ -8,6 +8,25 @@ namespace BossKey.Models
     internal static class WindowControllerCore
     {
         /// <summary>
+        /// 获取指定窗口的透明度值（0-255），如果窗口没有设置透明度，则返回 null
+        /// </summary>
+        /// <param name="hWnd"></param>
+        /// <returns></returns>
+        public static byte? GetWindowOpacity(nint hWnd)
+        {
+            nint exStyle = WindowsAPI.GetWindowLong(hWnd, WindowsAPI.WindowLongIndex.ExStyle);
+
+            if (((uint)exStyle & (uint)WindowsAPI.WindowExStyle.Layered) == 0)
+                return null;
+            if (!WindowsAPI.GetLayeredWindowAttributes(hWnd, out uint crKey, out byte alpha, out var flags))
+                return null;
+            if (!flags.HasFlag(WindowsAPI.LayeredWindowAttribute.Alpha))
+                return null;
+
+            return alpha;
+        }
+
+        /// <summary>
         /// 将指定窗口的透明度设置为指定值
         /// </summary>
         /// <param name="hWnd">窗口句柄</param>
@@ -57,6 +76,16 @@ namespace BossKey.Models
         }
 
         /// <summary>
+        /// 检查指定窗口是否可见
+        /// </summary>
+        /// <param name="hWnd"></param>
+        /// <returns></returns>
+        public static bool GetWindowVisible(nint hWnd)
+        {
+            return WindowsAPI.IsWindowVisible(hWnd);
+        }
+
+        /// <summary>
         /// 将指定窗口设置为可见或不可见
         /// </summary>
         /// <param name="hWnd"></param>
@@ -67,6 +96,17 @@ namespace BossKey.Models
                 hWnd,
                 visible ? WindowsAPI.ShowWindowCmd.Show : WindowsAPI.ShowWindowCmd.Hide);
             WindowsAPI.AssertLastError();
+        }
+
+        /// <summary>
+        /// 检查指定窗口是否为顶层窗口
+        /// </summary>
+        /// <param name="hWnd"></param>
+        /// <returns></returns>
+        public static bool GetWindowTopMost(nint hWnd)
+        {
+            nint exStyle = WindowsAPI.GetWindowLong(hWnd, WindowsAPI.WindowLongIndex.ExStyle);
+            return ((uint)exStyle & (uint)WindowsAPI.WindowExStyle.TopMost) != 0;
         }
 
         /// <summary>
@@ -86,6 +126,78 @@ namespace BossKey.Models
                 | WindowsAPI.SetWindowPosFlags.NoSize
                 | WindowsAPI.SetWindowPosFlags.NoActivate);
             WindowsAPI.AssertLastError();
+        }
+
+        /// <summary>
+        /// 获取指定窗口所在进程的当前音量
+        /// </summary>
+        /// <param name="hWnd">窗口句柄</param>
+        /// <param name="processId">进程 ID（0 表示从窗口获取），返回时设置为实际使用的进程 ID</param>
+        /// <returns>音量值 0.0-1.0，无法获取时返回 null</returns>
+        public static float? GetWindowProcessVolume(nint hWnd, ref nint processId)
+        {
+            // 获取目标进程 ID
+            uint targetPid;
+            if (processId == 0)
+            {
+                WindowsAPI.GetWindowThreadProcessId(hWnd, out targetPid);
+                processId = (nint)targetPid;
+            }
+            else
+            {
+                targetPid = (uint)processId;
+            }
+
+            try
+            {
+                var cw = new StrategyBasedComWrappers();
+
+                var clsid = new Guid("BCDE0395-E52F-467C-8E3D-C4579291692E");
+                var type = Type.GetTypeFromCLSID(clsid)!;
+                var obj = Activator.CreateInstance(type)!;
+                var enumerator = (WindowsAPI.IMMDeviceEnumerator)obj;
+
+                if (enumerator.GetDefaultAudioEndpoint(0, 0, out nint pDevice) != 0)
+                    return null;
+
+                var device = (WindowsAPI.IMMDevice)cw.GetOrCreateObjectForComInstance(pDevice, CreateObjectFlags.None);
+
+                Guid iidAsm2 = typeof(WindowsAPI.IAudioSessionManager2).GUID;
+                if (device.Activate(ref iidAsm2, 1, 0, out nint pAsm2) != 0)
+                    return null;
+
+                var sessionManager = (WindowsAPI.IAudioSessionManager2)cw.GetOrCreateObjectForComInstance(pAsm2, CreateObjectFlags.None);
+
+                if (sessionManager.GetSessionEnumerator(out nint pEnum) != 0)
+                    return null;
+                var sessionEnum = (WindowsAPI.IAudioSessionEnumerator)cw.GetOrCreateObjectForComInstance(pEnum, CreateObjectFlags.None);
+
+                sessionEnum.GetCount(out int count);
+
+                for (int i = 0; i < count; i++)
+                {
+                    if (sessionEnum.GetSession(i, out nint pSession) != 0)
+                        continue;
+
+                    var session = (WindowsAPI.IAudioSessionControl)cw.GetOrCreateObjectForComInstance(pSession, CreateObjectFlags.None);
+
+                    var session2 = (WindowsAPI.IAudioSessionControl2)session;
+                    session2.GetProcessId(out uint sessionPid);
+
+                    if (sessionPid == targetPid)
+                    {
+                        var simpleVolume = (WindowsAPI.ISimpleAudioVolume)session;
+                        simpleVolume.GetMasterVolume(out float vol);
+                        return vol;
+                    }
+                }
+
+                return null;
+            }
+            catch
+            {
+                return null;
+            }
         }
 
         /// <summary>
@@ -201,78 +313,6 @@ namespace BossKey.Models
 
             WindowsAPI.SetLayeredWindowAttributes(hWnd, crKey, alpha, flags);
             WindowsAPI.AssertLastError();
-        }
-
-        /// <summary>
-        /// 获取指定窗口所在进程的当前音量
-        /// </summary>
-        /// <param name="hWnd">窗口句柄</param>
-        /// <param name="processId">进程 ID（0 表示从窗口获取），返回时设置为实际使用的进程 ID</param>
-        /// <returns>音量值 0.0-1.0，无法获取时返回 null</returns>
-        public static float? GetWindowProcessVolume(nint hWnd, ref nint processId)
-        {
-            // 获取目标进程 ID
-            uint targetPid;
-            if (processId == 0)
-            {
-                WindowsAPI.GetWindowThreadProcessId(hWnd, out targetPid);
-                processId = (nint)targetPid;
-            }
-            else
-            {
-                targetPid = (uint)processId;
-            }
-
-            try
-            {
-                var cw = new StrategyBasedComWrappers();
-
-                var clsid = new Guid("BCDE0395-E52F-467C-8E3D-C4579291692E");
-                var type = Type.GetTypeFromCLSID(clsid)!;
-                var obj = Activator.CreateInstance(type)!;
-                var enumerator = (WindowsAPI.IMMDeviceEnumerator)obj;
-
-                if (enumerator.GetDefaultAudioEndpoint(0, 0, out nint pDevice) != 0)
-                    return null;
-
-                var device = (WindowsAPI.IMMDevice)cw.GetOrCreateObjectForComInstance(pDevice, CreateObjectFlags.None);
-
-                Guid iidAsm2 = typeof(WindowsAPI.IAudioSessionManager2).GUID;
-                if (device.Activate(ref iidAsm2, 1, 0, out nint pAsm2) != 0)
-                    return null;
-
-                var sessionManager = (WindowsAPI.IAudioSessionManager2)cw.GetOrCreateObjectForComInstance(pAsm2, CreateObjectFlags.None);
-
-                if (sessionManager.GetSessionEnumerator(out nint pEnum) != 0)
-                    return null;
-                var sessionEnum = (WindowsAPI.IAudioSessionEnumerator)cw.GetOrCreateObjectForComInstance(pEnum, CreateObjectFlags.None);
-
-                sessionEnum.GetCount(out int count);
-
-                for (int i = 0; i < count; i++)
-                {
-                    if (sessionEnum.GetSession(i, out nint pSession) != 0)
-                        continue;
-
-                    var session = (WindowsAPI.IAudioSessionControl)cw.GetOrCreateObjectForComInstance(pSession, CreateObjectFlags.None);
-
-                    var session2 = (WindowsAPI.IAudioSessionControl2)session;
-                    session2.GetProcessId(out uint sessionPid);
-
-                    if (sessionPid == targetPid)
-                    {
-                        var simpleVolume = (WindowsAPI.ISimpleAudioVolume)session;
-                        simpleVolume.GetMasterVolume(out float vol);
-                        return vol;
-                    }
-                }
-
-                return null;
-            }
-            catch
-            {
-                return null;
-            }
         }
     }
 }

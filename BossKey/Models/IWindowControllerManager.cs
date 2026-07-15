@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Text;
 
 namespace BossKey.Models
@@ -34,7 +35,17 @@ namespace BossKey.Models
         bool IsRegistered(nint hWnd);
 
         /// <summary>
-        /// 根据窗口句柄获取对应的窗口控制器，如果没有注册，则创建新的<see cref="IFixedWindowController"/>实例并注册。
+        /// 根据窗口句柄获取对应的窗口控制器，如果没有注册，则返回null。<br/>
+        /// 此方法不会增加引用计数。
+        /// </summary>
+        /// <param name="hWnd"></param>
+        /// <param name="controller"></param>
+        /// <returns></returns>
+        bool TryGet(nint hWnd, [NotNullWhen(true)] out IFixedWindowController? controller);
+
+        /// <summary>
+        /// 根据窗口句柄获取对应的窗口控制器并增加引用计数，如果没有注册，则创建新的<see cref="IFixedWindowController"/>实例并注册。<br/>
+        /// 无论是否已经注册，都会返回对应的窗口控制器实例，并增加引用计数。
         /// </summary>
         /// <param name="hWnd"></param>
         /// <returns></returns>

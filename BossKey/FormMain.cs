@@ -1,5 +1,6 @@
 using BossKey.Components;
 using BossKey.Models;
+using BossKey.Resources;
 using BossKey.Utils;
 using System.Diagnostics;
 using static System.Windows.Forms.VisualStyles.VisualStyleElement;
@@ -15,9 +16,39 @@ namespace BossKey
             InitializeComponent();
 
             _updatingListModel = new(listWindows, imageWindow);
+
+            InitTrayModel();
         }
 
         #region Methods
+
+        private void InitTrayModel()
+        {
+            ModelFactory.TrayModel.Show();
+            ModelFactory.TrayModel.OpenMainRequested += () =>
+            {
+                Invoke(() =>
+                {
+                    Show();
+                    WindowState = FormWindowState.Normal;
+                    Activate();
+                });
+            };
+            ModelFactory.TrayModel.ExitRequested += () =>
+            {
+                Invoke(() =>
+                {
+                    Application.Exit();
+                });
+            };
+            ModelFactory.TrayModel.RecentWindowStateChanged += hWnd =>
+            {
+                Invoke(() =>
+                {
+                    LoadControlPanelState();
+                });
+            };
+        }
 
         private void SyncBackWindowControllerSelection()
         {
@@ -305,6 +336,54 @@ namespace BossKey
             MessageBox.Show(message, title, MessageBoxButtons.OK, MessageBoxIcon.Error, default, MessageBoxOptions.ServiceNotification);
         }
 
+        private bool IsShouldTray()
+        {
+            string? action = GlobalConfigs.Instance.CloseAction;
+
+            if (action == "Tray")
+            {
+                return true;
+            }
+            else if (action == "Close")
+            {
+                return false;
+            }
+
+            var page = new TaskDialogPage
+            {
+                Caption = "退出确认",
+                Heading = "应用程序即将退出，您希望执行什么操作？",
+                Text = "退出应用程序将完全关闭，最小化到托盘则会在后台运行。",
+                Buttons =
+                {
+                    new TaskDialogButton("退出(&E)") { Tag = "Close" },
+                    new TaskDialogButton("最小化到托盘(&M)") { Tag = "Tray" }
+                },
+                Verification = new TaskDialogVerificationCheckBox
+                {
+                    Text = "记住我的选择",
+                    Checked = false
+                }
+            };
+
+            var result = TaskDialog.ShowDialog(this, page);
+            bool rememberChoice = page.Verification.Checked;
+
+            if (rememberChoice)
+            {
+                GlobalConfigs.Instance.CloseAction = Convert.ToString(result.Tag);
+            }
+            else
+            {
+                GlobalConfigs.Instance.CloseAction = null;
+            }
+
+            GlobalConfigs.Save();
+
+            return result.Tag is string actionResult
+                && actionResult == "Tray";
+        }
+
         private static int ToColorBGR(Color color)
         {
             return (color.B << 16) | (color.G << 8) | color.R;
@@ -411,7 +490,7 @@ namespace BossKey
             if (e.KeyCode == Keys.F12)
             {
                 // 切换开发模式
-                GlobalConfigs.DevelopMode = !GlobalConfigs.DevelopMode;
+                GlobalConfigs.Instance.DevelopMode = !GlobalConfigs.Instance.DevelopMode;
                 _updatingListModel.Invalidate();
             }
         }
@@ -429,6 +508,18 @@ namespace BossKey
                 {
                     // 由于是自动操作，所以不提示错误，只是静默同步回控件状态即可
                     SyncBackWindowControllerSelection();
+                }
+            }
+        }
+
+        private void FormMain_FormClosing(object sender, FormClosingEventArgs e)
+        {
+            if (e.CloseReason == CloseReason.UserClosing)
+            {
+                if (IsShouldTray())
+                {
+                    e.Cancel = true;
+                    Hide();
                 }
             }
         }

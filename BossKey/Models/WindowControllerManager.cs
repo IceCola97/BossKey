@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Text;
 
 namespace BossKey.Models
@@ -8,6 +9,20 @@ namespace BossKey.Models
     {
         private readonly Lock _lock = new();
         private readonly Dictionary<nint, ControllerReference> _controllers = [];
+
+        public WindowControllerManager()
+        {
+            ModelFactory.WindowScanner.WindowDestroyed += WindowScanner_WindowDestroyed;
+        }
+
+        private void WindowScanner_WindowDestroyed(ScannedWindow window)
+        {
+            lock (_lock)
+            {
+                // 窗口销毁时，移除对应的窗口控制器引用
+                _controllers.Remove(window.Handle);
+            }
+        }
 
         public bool IsRegistered(IFixedWindowController controller)
         {
@@ -51,7 +66,26 @@ namespace BossKey.Models
                 Register(resultController);
                 return resultController;
             }
+        }
 
+        public bool TryGet(nint hWnd, [NotNullWhen(true)] out IFixedWindowController? controller)
+        {
+            if (hWnd == 0)
+            {
+                throw new ArgumentException("窗口句柄无效。", nameof(hWnd));
+            }
+
+            lock (_lock)
+            {
+                if (_controllers.TryGetValue(hWnd, out var controllerRef))
+                {
+                    controller = controllerRef.Controller;
+                    return true;
+                }
+            }
+
+            controller = null;
+            return false;
         }
 
         public void Register(IFixedWindowController controller)
