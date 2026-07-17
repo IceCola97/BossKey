@@ -524,6 +524,62 @@ namespace BossKey
             }
         }
 
+        private void ButtonConfigs_Click(object sender, EventArgs e)
+        {
+            menuPreferencesRememberCloseAction.Enabled =
+                menuPreferencesRememberCloseAction.Checked = GlobalConfigs.Instance.CloseAction != null;
+
+            foreach (var item in menuPreferencesRecentWindowCount.DropDownItems.OfType<ToolStripMenuItem>())
+            {
+                item.Checked = false;
+            }
+
+            int count = GlobalConfigs.Instance.MaxRecentWindows;
+
+            switch (count)
+            {
+                case 5:
+                    menuPreferencesRecentWindowCountMax5.Checked = true;
+                    break;
+                case 10:
+                default:
+                    menuPreferencesRecentWindowCountMax10.Checked = true;
+                    break;
+                case 20:
+                    menuPreferencesRecentWindowCountMax20.Checked = true;
+                    break;
+            }
+
+            contextMenuPreferences.Show(MousePosition);
+        }
+
+        private void MenuPreferencesRememberCloseAction_Click(object sender, EventArgs e)
+        {
+            if (GlobalConfigs.Instance.CloseAction != null)
+            {
+                GlobalConfigs.Instance.CloseAction = null;
+                GlobalConfigs.Save();
+            }
+        }
+
+        private void MenuPreferencesRecentWindowCountMax5_Click(object sender, EventArgs e)
+        {
+            GlobalConfigs.Instance.MaxRecentWindows = 5;
+            GlobalConfigs.Save();
+        }
+
+        private void MenuPreferencesRecentWindowCountMax10_Click(object sender, EventArgs e)
+        {
+            GlobalConfigs.Instance.MaxRecentWindows = 10;
+            GlobalConfigs.Save();
+        }
+
+        private void MenuPreferencesRecentWindowCountMax20_Click(object sender, EventArgs e)
+        {
+            GlobalConfigs.Instance.MaxRecentWindows = 20;
+            GlobalConfigs.Save();
+        }
+
         #endregion Events
     }
 }
